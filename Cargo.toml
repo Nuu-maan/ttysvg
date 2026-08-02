@@ -13,14 +13,17 @@ categories = ["command-line-utilities"]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 crossterm = "0.28"
+gif = "0.14.2"
 portable-pty = "0.8"
 regex = "1"
+resvg = "0.48.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
 vt100 = "0.15"
 
 [dev-dependencies]
+gif = "0.14"
 insta = "1"
 
 [profile.release]

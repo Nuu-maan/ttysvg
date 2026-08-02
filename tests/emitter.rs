@@ -31,6 +31,7 @@ fn opts() -> RenderOpts {
         cols: COLS,
         rows: ROWS,
         loop_forever: true,
+        literal: None,
     }
     .with_metrics()
 }

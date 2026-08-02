@@ -76,6 +76,7 @@ fn svg_of(cfg: &Config, frames: &[(Duration, Frame)]) -> String {
         cols: cfg.cols,
         rows: cfg.rows,
         loop_forever: cfg.loop_forever,
+        literal: None,
     }
     .with_metrics();
     render(&tl, &render_opts)

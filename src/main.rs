@@ -7,6 +7,7 @@ use clap::{Args, Parser, Subcommand};
 
 use ttysvg::capture::{self, driver};
 use ttysvg::optimize::{self, Options};
+use ttysvg::raster;
 use ttysvg::redact::Rules;
 use ttysvg::session::Capture;
 use ttysvg::svg::theme::Theme;
@@ -73,6 +74,18 @@ impl PrivacyArgs {
 }
 
 #[derive(Args)]
+struct RasterArgs {
+    #[arg(long)]
+    gif: Option<PathBuf>,
+    #[arg(long)]
+    png: Option<PathBuf>,
+    #[arg(long, default_value_t = 1.0)]
+    scale: f32,
+    #[arg(long)]
+    light: bool,
+}
+
+#[derive(Args)]
 struct RecordArgs {
     #[arg(short, long)]
     out: Option<PathBuf>,
@@ -92,6 +105,8 @@ struct RecordArgs {
     style: StyleArgs,
     #[command(flatten)]
     privacy: PrivacyArgs,
+    #[command(flatten)]
+    raster: RasterArgs,
     #[arg(last = true, required = true)]
     command: Vec<String>,
 }
@@ -113,6 +128,8 @@ struct BuildArgs {
     title: Option<String>,
     #[command(flatten)]
     privacy: PrivacyArgs,
+    #[command(flatten)]
+    raster: RasterArgs,
 }
 
 #[derive(Args)]
@@ -150,6 +167,8 @@ struct RenderArgs {
     info: bool,
     #[command(flatten)]
     privacy: PrivacyArgs,
+    #[command(flatten)]
+    raster: RasterArgs,
 }
 
 fn main() -> Result<()> {
@@ -252,7 +271,7 @@ fn record(a: RecordArgs) -> Result<()> {
     if !want_svg {
         return Ok(());
     }
-    emit(&cfg, theme, &frames)
+    emit(&cfg, theme, &frames, &a.raster)
 }
 
 fn save_capture(
@@ -323,7 +342,7 @@ fn build(a: BuildArgs) -> Result<()> {
         save_capture(path, &cfg.shell, &cfg, &frames, &rules)?;
     }
 
-    emit(&cfg, theme, &frames)
+    emit(&cfg, theme, &frames, &a.raster)
 }
 
 fn rerender(a: RenderArgs) -> Result<()> {
@@ -408,7 +427,7 @@ fn rerender(a: RenderArgs) -> Result<()> {
     }
 
     let theme = load_theme(&cfg.theme)?;
-    emit(&cfg, theme, &frames)
+    emit(&cfg, theme, &frames, &a.raster)
 }
 
 fn load_theme(name: &str) -> Result<Theme> {
@@ -417,7 +436,12 @@ fn load_theme(name: &str) -> Result<Theme> {
     Ok(theme)
 }
 
-fn emit(cfg: &Config, theme: Theme, raw: &[(Duration, Frame)]) -> Result<()> {
+fn emit(
+    cfg: &Config,
+    theme: Theme,
+    raw: &[(Duration, Frame)],
+    raster_args: &RasterArgs,
+) -> Result<()> {
     let opts = Options {
         trim_idle: cfg.trim_idle,
         tail: cfg.tail,
@@ -442,18 +466,13 @@ fn emit(cfg: &Config, theme: Theme, raw: &[(Duration, Frame)]) -> Result<()> {
         cols: cfg.cols,
         rows: cfg.rows,
         loop_forever: cfg.loop_forever,
+        literal: None,
     }
     .with_metrics();
 
     let svg = render(&tl, &render_opts);
 
-    if let Some(dir) = cfg.output.parent() {
-        if !dir.as_os_str().is_empty() {
-            std::fs::create_dir_all(dir)?;
-        }
-    }
-    std::fs::write(&cfg.output, svg.as_bytes())
-        .with_context(|| format!("writing {}", cfg.output.display()))?;
+    write_out(&cfg.output, svg.as_bytes())?;
 
     eprintln!(
         "ttysvg: wrote {} ({} frames, {:.1}s, {})",
@@ -462,7 +481,44 @@ fn emit(cfg: &Config, theme: Theme, raw: &[(Duration, Frame)]) -> Result<()> {
         tl.total.as_secs_f64(),
         human_size(svg.len())
     );
+
+    let scale = raster_args.scale;
+    if scale <= 0.0 {
+        anyhow::bail!("scale must be greater than zero");
+    }
+
+    if let Some(path) = &raster_args.png {
+        let bytes = raster::png(&tl, &render_opts, scale, raster_args.light)?;
+        write_out(path, &bytes)?;
+        eprintln!(
+            "ttysvg: wrote {} (last frame, {})",
+            path.display(),
+            human_size(bytes.len())
+        );
+    }
+
+    if let Some(path) = &raster_args.gif {
+        eprintln!("ttysvg: rasterizing {} frames for the gif", tl.len());
+        let bytes = raster::gif(&tl, &render_opts, scale, raster_args.light)?;
+        write_out(path, &bytes)?;
+        eprintln!(
+            "ttysvg: wrote {} ({} frames, {})",
+            path.display(),
+            tl.len(),
+            human_size(bytes.len())
+        );
+    }
+
     Ok(())
+}
+
+fn write_out(path: &Path, bytes: &[u8]) -> Result<()> {
+    if let Some(dir) = path.parent() {
+        if !dir.as_os_str().is_empty() {
+            std::fs::create_dir_all(dir)?;
+        }
+    }
+    std::fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
 }
 
 fn human_size(bytes: usize) -> String {

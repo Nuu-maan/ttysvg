@@ -51,6 +51,9 @@ pub fn spawn(argv: &[String], cols: u16, rows: u16, echo: bool, rules: &Rules) -
     if let Ok(cwd) = std::env::current_dir() {
         cmd.cwd(cwd);
     }
+    if let Some(path) = std::env::var_os("PATH") {
+        cmd.env("PATH", path);
+    }
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("CLICOLOR_FORCE", "1");

@@ -6,10 +6,11 @@ use std::fmt::Write as _;
 use crate::optimize::Timeline;
 use crate::svg::text::{escape, num, pct};
 use crate::svg::theme::{paint, Palette, Theme};
-use crate::term::Frame;
+use crate::term::{Color, Frame};
 
 #[derive(Clone, Debug)]
 pub struct RenderOpts {
+    pub literal: Option<Palette>,
     pub theme: Theme,
     pub font_family: String,
     pub font_size: f64,
@@ -58,19 +59,25 @@ pub fn render(tl: &Timeline, o: &RenderOpts) -> String {
     );
 
     s.push_str("<style>");
-    vars(&mut s, ":root", &o.theme.dark);
-    s.push_str("@media(prefers-color-scheme:light){");
-    vars(&mut s, ":root", &o.theme.light);
-    s.push('}');
-    s.push_str(":root[data-theme=\"light\"]{");
-    inner_vars(&mut s, &o.theme.light);
-    s.push('}');
-    s.push_str(":root[data-theme=\"dark\"]{");
-    inner_vars(&mut s, &o.theme.dark);
-    s.push('}');
+    if o.literal.is_none() {
+        vars(&mut s, ":root", &o.theme.dark);
+        s.push_str("@media(prefers-color-scheme:light){");
+        vars(&mut s, ":root", &o.theme.light);
+        s.push('}');
+        s.push_str(":root[data-theme=\"light\"]{");
+        inner_vars(&mut s, &o.theme.light);
+        s.push('}');
+        s.push_str(":root[data-theme=\"dark\"]{");
+        inner_vars(&mut s, &o.theme.dark);
+        s.push('}');
+    }
     s.push_str("text{white-space:pre;font-variant-ligatures:none}");
     s.push_str(".b{font-weight:700}.i{font-style:italic}.u{text-decoration:underline}");
-    s.push_str(".cur{fill:var(--fg);opacity:.7}");
+    let _ = write!(
+        s,
+        ".cur{{fill:{};opacity:.7}}",
+        paint(Color::Default, "fg", o.literal.as_ref())
+    );
 
     if tl.len() > 1 {
         keyframes(&mut s, tl, content_h);
@@ -89,10 +96,11 @@ pub fn render(tl: &Timeline, o: &RenderOpts) -> String {
 
     let _ = write!(
         s,
-        r#"<rect width="{w}" height="{h}" rx="{r}" fill="var(--bg)"/>"#,
+        r#"<rect width="{w}" height="{h}" rx="{r}" fill="{f}"/>"#,
         w = num(width),
         h = num(height),
         r = if o.window { 10 } else { 6 },
+        f = paint(Color::Default, "bg", o.literal.as_ref()),
     );
 
     if o.window {
@@ -174,8 +182,9 @@ fn chrome_bar(s: &mut String, o: &RenderOpts, width: f64) {
     if !o.title.is_empty() {
         let _ = write!(
             s,
-            r#"<text x="{x}" y="21" text-anchor="middle" fill="var(--fg)" opacity=".55" font-size="{fs}px">{t}</text>"#,
+            r#"<text x="{x}" y="21" text-anchor="middle" fill="{f}" opacity=".55" font-size="{fs}px">{t}</text>"#,
             x = num(width / 2.0),
+            f = paint(Color::Default, "fg", o.literal.as_ref()),
             fs = num(o.font_size * 0.85),
             t = escape(&o.title),
         );
@@ -195,7 +204,7 @@ fn emit_frame(s: &mut String, frame: &Frame, o: &RenderOpts, baseline: f64) {
                 y = num(r as f64 * o.line_height),
                 w = num(run.width as f64 * o.advance),
                 h = num(o.line_height),
-                f = paint(run.style.bg, "bg"),
+                f = paint(run.style.bg, "bg", o.literal.as_ref()),
             );
         }
     }
@@ -235,7 +244,7 @@ fn emit_frame(s: &mut String, frame: &Frame, o: &RenderOpts, baseline: f64) {
                 s,
                 r#"<tspan x="{x}" fill="{f}""#,
                 x = num(run.col as f64 * o.advance),
-                f = paint(run.style.fg, "fg"),
+                f = paint(run.style.fg, "fg", o.literal.as_ref()),
             );
             if !class.is_empty() {
                 let _ = write!(s, r#" class="{}""#, class.trim());
