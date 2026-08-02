@@ -87,7 +87,21 @@ pub fn xterm256(idx: u8) -> String {
     }
 }
 
-pub fn paint(color: Color, fallback: &str) -> String {
+pub fn paint(color: Color, fallback: &str, literal: Option<&Palette>) -> String {
+    if let Some(p) = literal {
+        return match color {
+            Color::Default => {
+                if fallback == "bg" {
+                    p.bg.clone()
+                } else {
+                    p.fg.clone()
+                }
+            }
+            Color::Idx(i) if (i as usize) < p.ansi.len() => p.ansi[i as usize].clone(),
+            Color::Idx(i) => xterm256(i),
+            Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+        };
+    }
     match color {
         Color::Default => format!("var(--{fallback})"),
         Color::Idx(i) if i < 16 => format!("var(--c{i})"),
