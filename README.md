@@ -297,97 +297,116 @@ paths like `type ".\scripts\build.ps1"` work as written.
 
 ## Examples
 
-Every block below is a complete tape. Save it as `demo.tape`, run
-`ttysvg build demo.tape`, and adjust the command in the middle to your own. They are
-folded away so this page stays readable, so open only the one that matches what you are
+Nine complete tapes for the situations people actually record, each with the recording it
+produced. Every tape below is a real file in [`examples/`](examples), and every animation
+is the output of running that exact file, not a mock up.
+
+They are folded away so this page stays readable. Open the one that matches what you are
 trying to record.
 
 <details>
 <summary><b>A README banner for a command line tool</b></summary>
 
+<p align="center">
+  <img src="docs/examples/banner.svg" alt="recording of ttysvg --help" width="100%">
+</p>
+
 The most common case. A fixed size, a clean prompt with no machine name in it, and a
 title bar so it reads as a terminal rather than a screenshot of text.
 
 ```tape
-output "docs/banner.svg"
+output "../docs/examples/banner.svg"
 theme "tokyonight"
 width 78
 height 16
 padding 20
 window on
-title "mytool"
+title "ttysvg"
 
-shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { 'mytool $ ' }; Clear-Host"
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { 'ttysvg $ ' }; Clear-Host"
 
 type-delay 55ms
 trim-idle 700ms
 tail 2500ms
 
-wait  "mytool $" 20s
-type  "mytool --help"
+wait  "ttysvg $" 20s
+type  "ttysvg --help"
 enter
-wait  "USAGE" 10s
+wait  "Usage" 10s
 sleep 1500ms
 ```
 
-The `wait "USAGE"` is doing the real work. It holds until your help text is actually on
-screen, so the recording cannot end early on a slow machine.
+The `wait "Usage"` is doing the real work. It holds until the help text is actually on
+screen, so the recording cannot end early on a slow machine. Swap `ttysvg` for your own
+tool and the rest stands.
+
+Run it with `ttysvg build examples/banner.tape`.
 
 </details>
 
 <details>
 <summary><b>A full screen TUI</b></summary>
 
+<p align="center">
+  <img src="docs/examples/tui.svg" alt="recording of a full screen terminal dashboard" width="100%">
+</p>
+
 Anything that draws a whole screen, moves the cursor around and redraws in place. This is
 the case a naive recorder gets wrong, and the reason ttysvg keeps a real terminal grid
 rather than replaying escape sequences.
 
 ```tape
-output "docs/tui.svg"
+output "../docs/examples/tui.svg"
 theme "catppuccin"
-width 100
-height 30
+width 96
+height 26
 window on
-title "lazygit"
+title "glowfetch"
 
-shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "Clear-Host"
+sanitize on
 
-type-delay 40ms
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
+
+type-delay 45ms
 trim-idle 500ms
+tail 2s
 
-type  "lazygit"
+wait  "$" 20s
+type  "glowfetch"
 enter
-sleep 3s
-
-down 3
-sleep 900ms
-right
-sleep 1200ms
-tab
-sleep 1200ms
-
+sleep 6s
 type  "q"
-sleep 800ms
+sleep 1200ms
 ```
 
-Give the program time to paint before sending keys. A TUI that is still starting up will
-swallow the first keystroke, and the recording will look like the tool ignored you.
+Give the program time to paint before sending keys. A TUI that is still starting up
+swallows the first keystroke, and the recording ends up looking like the tool ignored you.
+
+`sanitize on` matters here. System dashboards print your username and hostname by
+default, and this is exactly the kind of recording that ends up in a README. Substitute
+`lazygit`, `btop` or any other full screen tool.
+
+Run it with `ttysvg build examples/tui.tape`.
 
 </details>
 
 <details>
 <summary><b>A long build or test run, sped up</b></summary>
 
-Nobody wants to watch ninety seconds of compiler output at real speed, but cutting it
-entirely loses the point. Speed up the playback and clamp the dead air.
+<p align="center">
+  <img src="docs/examples/build.svg" alt="recording of a cargo test run" width="100%">
+</p>
+
+Nobody wants to watch a full compile at real speed, but cutting it loses the point.
+Speed up the playback and clamp the dead air.
 
 ```tape
-output "docs/build.svg"
+output "../docs/examples/build.svg"
 theme "gruvbox"
-width 100
+width 96
 height 24
 window on
-title "cargo build --release"
+title "cargo test"
 
 shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
 
@@ -396,149 +415,183 @@ trim-idle 400ms
 tail 3s
 
 wait  "$" 15s
-type  "cargo build --release"
+type  "cargo test"
 enter
-wait  "Finished" 300s
-sleep 2s
+wait  "test result" 300s
+sleep 2500ms
 ```
 
 `speed 3.0` plays the whole thing three times faster. `trim-idle 400ms` separately caps
-every gap, so a linker that stalls for twenty seconds becomes a short pause instead of a
-frozen picture. The generous `300s` on the wait is a safety net, not a delay, since it
-returns the moment the text appears.
+every gap, so a linker that stalls for twenty seconds becomes a short pause rather than a
+frozen picture. The two are different tools and are worth setting independently.
+
+The generous `300s` on the wait is a safety net, not a delay. It returns the moment the
+text appears, so a fast machine is not punished for it.
+
+Run it with `ttysvg build examples/build.tape`.
 
 </details>
 
 <details>
 <summary><b>An interactive prompt or wizard</b></summary>
 
-Scaffolding tools, `npm init`, anything that asks questions. Arrow keys and enter, with
-pauses so a viewer can read each question before the answer arrives.
+<p align="center">
+  <img src="docs/examples/prompt.svg" alt="recording of an interactive setup prompt" width="100%">
+</p>
+
+Scaffolding tools, `npm init`, anything that asks questions and waits. The point is to
+answer the question only after it is on screen.
 
 ```tape
-output "docs/init.svg"
+output "../docs/examples/prompt.svg"
 theme "nord"
 width 84
-height 20
+height 18
 window on
-title "create-app"
+title "setup"
 
 shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
 
 type-delay 60ms
+trim-idle 600ms
+tail 3s
 
 wait  "$" 15s
-type  "npm create vite@latest"
+type  "$name = Read-Host 'Project name'"
 enter
-
-wait  "Project name" 30s
-sleep 800ms
+wait  "Project name" 10s
+sleep 900ms
 type  "my-app"
 enter
+sleep 800ms
 
-wait  "framework" 20s
-sleep 1s
-down 2
-sleep 700ms
+type  "$stack = Read-Host 'Framework'"
 enter
-
-wait  "variant" 20s
+wait  "Framework" 10s
 sleep 900ms
+type  "vite"
 enter
-sleep 2s
+sleep 800ms
+
+type  "Write-Host \"scaffolding $name with $stack\""
+enter
+wait  "scaffolding" 10s
+sleep 1500ms
 ```
 
-Wait on the question text rather than sleeping a fixed amount. Package managers vary
-wildly in how long they take to show the first prompt.
+Wait on the question text rather than sleeping a fixed amount. Tools vary wildly in how
+long they take to show a first prompt, and a fixed sleep is the single most common reason
+a scripted demo desynchronizes.
+
+Run it with `ttysvg build examples/prompt.tape`.
 
 </details>
 
 <details>
 <summary><b>A REPL session</b></summary>
 
+<p align="center">
+  <img src="docs/examples/repl.svg" alt="recording of a python repl session" width="100%">
+</p>
+
 Language demos, library tutorials, anything where the output of one line motivates the
-next. A slower type delay makes it feel like a person is typing.
+next. A slower type delay makes it read like a person thinking.
 
 ```tape
-output "docs/repl.svg"
+output "../docs/examples/repl.svg"
 theme "tokyonight"
 width 76
 height 18
 padding 22
 
-shell "python" "-q"
+shell "python" "-q" "-i"
 
 type-delay 75ms
 trim-idle 600ms
 tail 3s
 
-wait  ">>>" 15s
-type  "import mylib"
+wait  ">>>" 20s
+type  "import json"
 enter
 sleep 600ms
 
-type  "mylib.parse('2 + 2 * 3')"
+type  "json.dumps({'frames': 91, 'seconds': 7.2})"
 enter
-wait  "8" 10s
+wait  "frames" 10s
 sleep 1200ms
 
-type  "mylib.explain(_)"
+type  "sum(len(w) for w in 'terminal to animated svg'.split())"
 enter
 sleep 2s
 ```
 
-Note the shell is the REPL itself, with no wrapper. `wait ">>>"` catches the banner
-finishing, and `wait "8"` proves the evaluation actually happened.
+The shell is the REPL itself, with no wrapper around it. `wait ">>>"` catches the
+interpreter finishing its startup, and `wait "frames"` proves the evaluation actually
+happened rather than assuming it did.
+
+Run it with `ttysvg build examples/repl.tape`.
 
 </details>
 
 <details>
-<summary><b>A deploy or anything holding credentials</b></summary>
+<summary><b>A deploy, or anything holding credentials</b></summary>
 
-The case where getting it wrong publishes a key. Redaction runs before anything is
-written, so the secret is never in the SVG or in a saved capture.
+<p align="center">
+  <img src="docs/examples/secrets.svg" alt="recording with the api key and home path masked" width="100%">
+</p>
+
+The case where getting it wrong publishes a key. The recording above printed a real
+looking API key, a token and a home directory. None of them survived into the file.
 
 ```tape
-output "docs/deploy.svg"
+output "../docs/examples/secrets.svg"
 theme "gruvbox"
 width 92
-height 20
+height 14
 window on
 title "deploy"
 
 sanitize on
 redact "sk-[A-Za-z0-9]+"
 redact "ghp_[A-Za-z0-9]+"
-redact "Bearer [A-Za-z0-9._-]+"
-redact "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 
 shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
 
+type-delay 45ms
+trim-idle 600ms
+tail 3s
+
 wait  "$" 15s
-type  "./deploy.ps1 --env production"
+type  "Write-Host \"key=sk-Ab3xQ9zz token=ghp_9dK2vLm4 home=$env:USERPROFILE\""
 enter
-wait  "deployed" 120s
-sleep 2s
+wait  "key=" 15s
+sleep 2500ms
 ```
 
-`sanitize on` covers your home directory, username and hostname without a regex. The
-patterns cover the rest, including the server address. Open the finished SVG and read it
-before pushing, since a secret split across two colors by a syntax highlighter is not
-matched.
+Masking runs the moment a frame is captured, so the secret is never written to the SVG or
+to a saved capture, and the mask keeps the original character count so nothing shifts.
+Read the finished file before publishing anyway, since a secret split across two colors by
+a syntax highlighter is not matched.
+
+Run it with `ttysvg build examples/secrets.tape`.
 
 </details>
 
 <details>
-<summary><b>Explaining an error, not just a success</b></summary>
+<summary><b>Showing an error before the fix</b></summary>
+
+<p align="center">
+  <img src="docs/examples/error.svg" alt="recording of a failing command followed by a working one" width="100%">
+</p>
 
 The most useful recordings in a bug report or a tutorial show the failure first. Two
 commands in one take, with a pause long enough to read the message.
 
 ```tape
-output "docs/fix.svg"
+output "../docs/examples/error.svg"
 theme "catppuccin"
 width 88
-height 22
+height 18
 window on
 title "the fix"
 
@@ -549,33 +602,40 @@ trim-idle 800ms
 tail 4s
 
 wait  "$" 15s
-type  "mytool build"
+type  "ttysvg render missing.json"
 enter
-wait  "error" 60s
+wait  "Caused by" 20s
 sleep 2500ms
 
-type  "mytool build --target wasm32-unknown-unknown"
+type  "ttysvg themes"
 enter
-wait  "Finished" 120s
+wait  "nord" 10s
 sleep 2s
 ```
 
-The long `tail 4s` holds the final state before the loop restarts, so the resolution is
-on screen long enough to register.
+Waiting on `Caused by` rather than a fixed sleep means the recording is driven by the
+error actually appearing. The long `tail 4s` holds the final state before the loop
+restarts, so the resolution stays on screen long enough to register.
+
+Run it with `ttysvg build examples/error.tape`.
 
 </details>
 
 <details>
 <summary><b>A git workflow</b></summary>
 
-Several short commands where the interesting part is the sequence rather than any one
+<p align="center">
+  <img src="docs/examples/git.svg" alt="recording of git log and git status" width="100%">
+</p>
+
+Several short commands where the interesting part is the sequence rather than any single
 output.
 
 ```tape
-output "docs/git.svg"
+output "../docs/examples/git.svg"
 theme "nord"
-width 92
-height 24
+width 88
+height 16
 window on
 title "git"
 
@@ -583,43 +643,47 @@ shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function pro
 
 type-delay 45ms
 trim-idle 500ms
+tail 3s
 
 wait  "$" 15s
-type  "git status --short"
-enter
-sleep 1500ms
-
-type  "git add -A"
-enter
-sleep 800ms
-
-type  "git commit -m \"add the parser\""
+type  "git --no-pager log --oneline -5"
 enter
 sleep 1800ms
 
-type  "git log --oneline -5"
+type  "git status --short --branch"
 enter
 sleep 2500ms
 ```
 
-Note the escaped quotes inside the commit message. Only `\"` and `\\` are escapes, so
-Windows paths stay literal.
+`--no-pager` is not optional. Git opens a pager when output does not fit, and a pager
+waiting for a keypress inside a recording looks like a hang.
+
+If you record a command that writes, remember the tape really runs it. Keep demos on
+read only commands or on a scratch repository.
+
+Run it with `ttysvg build examples/git.tape`.
 
 </details>
 
 <details>
 <summary><b>Linux and macOS</b></summary>
 
+<p align="center">
+  <img src="docs/examples/bash.svg" alt="recording of a bash session" width="100%">
+</p>
+
 Same tool, different shell line. Everything after the terminal parser is platform
-independent, so the rest of the tape is unchanged.
+independent, so the rest of the tape is unchanged. This one was recorded through bash on
+the same Windows machine as the others, which is the shortest proof that the shell is the
+only thing that changes.
 
 ```tape
-output "docs/demo-linux.svg"
+output "../docs/examples/bash.svg"
 theme "tokyonight"
 width 84
-height 20
+height 18
 window on
-title "mytool"
+title "bash"
 
 shell "bash" "--norc" "-i"
 
@@ -628,26 +692,39 @@ trim-idle 700ms
 tail 2500ms
 
 wait  "$" 15s
-type  "export PS1='mytool $ ' && clear"
+type  "export PS1='demo $ ' && clear"
 enter
-sleep 600ms
+sleep 800ms
 
-type  "mytool --help"
+type  "ttysvg themes | tr '\n' ' '"
 enter
-wait  "USAGE" 15s
+wait  "nord" 15s
 sleep 1500ms
 ```
 
 `--norc` keeps someone else's prompt theme out of your recording. Setting `PS1` and
 clearing gives the same neutral prompt the Windows examples build with `function prompt`.
 
+Run it with `ttysvg build examples/bash.tape`.
+
 </details>
 
 <details>
-<summary><b>One recording, every theme</b></summary>
+<summary><b>One recording, every theme and size</b></summary>
 
-This one is not a tape. Record once, then render the same frames repeatedly. Useful for
-picking a theme, and for a docs page that shows all of them without recording four times.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/examples/theme-tokyonight.svg" alt="tokyonight" width="100%"></td>
+    <td width="50%"><img src="docs/examples/theme-catppuccin.svg" alt="catppuccin" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/examples/theme-gruvbox.svg" alt="gruvbox" width="100%"></td>
+    <td width="50%"><img src="docs/examples/theme-nord.svg" alt="nord" width="100%"></td>
+  </tr>
+</table>
+
+Those four are the same recording, rendered four times. Nothing was executed again. This
+is not a tape, it is what a saved capture is for.
 
 ```
 ttysvg record --save session.json --out docs/demo.svg -- mytool --help
@@ -658,16 +735,16 @@ ttysvg render session.json --theme gruvbox    --out docs/gruvbox.svg
 ttysvg render session.json --theme nord       --out docs/nord.svg
 ```
 
-Each render takes milliseconds because nothing is executed. The same trick gives you a
-wide social preview and a compact README banner from one take:
+Each render takes milliseconds. The same trick gives a wide social preview and a compact
+inline banner from one take:
 
 ```
 ttysvg render session.json --font-size 18 --padding 32 --out docs/social.svg
 ttysvg render session.json --font-size 12 --padding 12 --no-loop --out docs/inline.svg
 ```
 
-Everything except `--cols` and `--rows` can change after the fact. Those are fixed at
-record time because the text has already wrapped.
+Everything except `--cols` and `--rows` can change after the fact. Those two are fixed at
+record time, because by then the text has already wrapped.
 
 </details>
 
@@ -781,6 +858,12 @@ and the resulting SVG, and say which terminal and Windows version you are on.
 
 ## Known limits
 
+- **The recorded shell does not inherit PATH changes.** Ordinary environment variables
+  are passed through, but a directory you added to `PATH` in the shell you launched
+  ttysvg from will not be on the recorded shell's `PATH`, so a tool found there comes out
+  as "not recognized". Put the tool somewhere already on `PATH`, or set it inside the
+  tape, which is what `examples/demo.tape` does:
+  `"-Command" "$env:Path = 'target\release;' + $env:Path; ..."`.
 - **Redaction matches within one run of same styled text.** A secret is masked when it
   sits in a single stretch of one color on one line. If a syntax highlighter splits it
   across colors, or it wraps to the next line, the pattern will not see it as one string.
