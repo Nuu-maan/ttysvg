@@ -858,12 +858,6 @@ and the resulting SVG, and say which terminal and Windows version you are on.
 
 ## Known limits
 
-- **The recorded shell does not inherit PATH changes.** Ordinary environment variables
-  are passed through, but a directory you added to `PATH` in the shell you launched
-  ttysvg from will not be on the recorded shell's `PATH`, so a tool found there comes out
-  as "not recognized". Put the tool somewhere already on `PATH`, or set it inside the
-  tape, which is what `examples/demo.tape` does:
-  `"-Command" "$env:Path = 'target\release;' + $env:Path; ..."`.
 - **Redaction matches within one run of same styled text.** A secret is masked when it
   sits in a single stretch of one color on one line. If a syntax highlighter splits it
   across colors, or it wraps to the next line, the pattern will not see it as one string.
