@@ -149,6 +149,52 @@ ttysvg record --save session.json -- ./my-tool
 ttysvg build demo.tape --save demo.json
 ```
 
+## Recording something real
+
+A recording is a publishing format. Whatever was on screen ends up in a file that goes
+into a README, and a capture stores it as plain readable text. Two flags exist so that
+does not become a problem.
+
+```
+ttysvg record --sanitize --redact "sk-[A-Za-z0-9]+" --out demo.svg -- ./deploy
+```
+
+`--sanitize` handles the boring case with no regex. It rewrites your home directory to
+`~`, and replaces your username and hostname with `user` and `host`. That alone covers
+most of what makes people delete a demo and record it again.
+
+`--redact` takes a regex and masks every match with `*`, and can be repeated. Use it for
+anything shaped like a secret:
+
+```
+--redact "sk-[A-Za-z0-9]+"        # OpenAI style keys
+--redact "ghp_[A-Za-z0-9]+"       # GitHub tokens
+--redact "Bearer [A-Za-z0-9._-]+" # authorization headers
+```
+
+In a tape the same two settings are directives:
+
+```
+sanitize on
+redact "sk-[A-Za-z0-9]+"
+redact "ghp_[A-Za-z0-9]+"
+```
+
+Redaction runs the moment a frame is captured, before anything is written, so a masked
+secret is never in the SVG or the capture. It also covers the command line itself, which
+matters when the secret is an argument rather than output. Masking keeps the original
+character count, so the layout does not move.
+
+If you already have a capture that was recorded without it, the same flags work on
+`render` and will clean the output without re-running anything:
+
+```
+ttysvg render session.json --sanitize --redact "sk-[A-Za-z0-9]+"
+```
+
+That cleans the SVG it writes. It does not rewrite the capture file, so delete that too
+if it already holds something it should not.
+
 ## Command reference
 
 ### ttysvg record
@@ -159,6 +205,8 @@ Captures a live session. Stops when the program exits.
 |---|---|---|
 | `--out` | `demo.svg` | Output path |
 | `--save` | off | Also write the raw capture, for `ttysvg render` |
+| `--redact` | none | Mask everything matching this regex, repeatable |
+| `--sanitize` | off | Rewrite the home directory, username and hostname |
 | `--cols` `--rows` | your terminal size | Recording size in characters |
 | `--theme` | `tokyonight` | Theme name or path to a theme file |
 | `--font` | system monospace stack | CSS font family used in the output |
@@ -183,6 +231,7 @@ Runs a tape. Any flag given here overrides the tape.
 |---|---|
 | `--out` | Output path |
 | `--save` | Also write the raw capture, for `ttysvg render` |
+| `--redact` `--sanitize` | Added to whatever the tape already sets |
 | `--theme` | Theme name or path |
 | `--speed` | Playback multiplier |
 | `--window` | Force the title bar on |
@@ -202,6 +251,7 @@ value the recording was made with.
 | `--trim-idle` `--speed` `--tail` | as recorded | Retime without re-running anything |
 | `--window` `--no-window` `--title` | as recorded | Title bar, either direction |
 | `--no-loop` | as recorded | Play once instead of looping |
+| `--redact` `--sanitize` | none | Clean a capture that was recorded without them |
 
 ### ttysvg themes
 
@@ -223,6 +273,8 @@ Settings, valid anywhere in the file:
 | `window` `title` `loop` | `window on` |
 | `trim-idle` `tail` `speed` | `trim-idle 500ms` |
 | `type-delay` | `type-delay 40ms` |
+| `redact` | `redact "sk-[A-Za-z0-9]+"` |
+| `sanitize` | `sanitize on` |
 
 Actions, run in order:
 
@@ -313,6 +365,7 @@ Where things live:
 src/capture/    spawning a pty, reading it, running a tape against it
 src/term/       terminal grid to Frame, the platform independent boundary
 src/optimize.rs dedupe, trim idle, quantize, speed, tail
+src/redact.rs   masking secrets and rewriting paths before anything is written
 src/session.rs  saving and loading a capture, so it can be re-rendered
 src/svg/        the emitter, themes, escaping
 src/tape/       tape tokenizer and directives
@@ -349,6 +402,10 @@ and the resulting SVG, and say which terminal and Windows version you are on.
 
 ## Known limits
 
+- **Redaction matches within one run of same styled text.** A secret is masked when it
+  sits in a single stretch of one color on one line. If a syntax highlighter splits it
+  across colors, or it wraps to the next line, the pattern will not see it as one string.
+  Check the output before publishing rather than assuming a pattern caught everything.
 - **A saved capture cannot be resized.** `ttysvg render` can change every visual and
   timing setting except `--cols` and `--rows`. A capture stores the terminal grid after
   wrapping, not the bytes that produced it, so reflowing to a new width would need the
