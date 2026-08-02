@@ -51,13 +51,11 @@ fn tokenize(line: &str) -> Result<Vec<String>> {
                 in_quote = !in_quote;
                 started = true;
             }
-            '\\' if in_quote => match chars.next() {
-                Some('n') => cur.push('\n'),
-                Some('t') => cur.push('\t'),
-                Some('r') => cur.push('\r'),
-                Some('e') => cur.push('\x1b'),
-                Some(other) => cur.push(other),
-                None => bail!("trailing backslash"),
+            '\\' if in_quote => match chars.peek() {
+                Some('"') | Some('\\') => {
+                    cur.push(chars.next().unwrap());
+                }
+                _ => cur.push('\\'),
             },
             c if c.is_whitespace() && !in_quote => {
                 if started || !cur.is_empty() {
@@ -224,6 +222,24 @@ mod tests {
     fn comments_outside_quotes_are_stripped() {
         assert_eq!(strip_comment("width 90 # cols").trim(), "width 90");
         assert_eq!(strip_comment(r#"type "a#b""#).trim(), r#"type "a#b""#);
+    }
+
+    #[test]
+    fn windows_paths_survive_intact() {
+        let toks = tokenize(r#"type ".\scripts\showcase.ps1""#).unwrap();
+        assert_eq!(toks, vec!["type", r".\scripts\showcase.ps1"]);
+
+        let toks = tokenize(r#"type "C:\temp\new\report.txt""#).unwrap();
+        assert_eq!(toks, vec!["type", r"C:\temp\new\report.txt"]);
+    }
+
+    #[test]
+    fn quotes_and_backslashes_can_still_be_escaped() {
+        let toks = tokenize(r#"type "say \"hi\" now""#).unwrap();
+        assert_eq!(toks, vec!["type", r#"say "hi" now"#]);
+
+        let toks = tokenize(r#"type "a\\b""#).unwrap();
+        assert_eq!(toks, vec!["type", r"a\b"]);
     }
 
     #[test]
