@@ -118,6 +118,37 @@ Once you have a tape, rebuilding in a different theme costs nothing:
 ttysvg build demo.tape --theme gruvbox --out demo-gruvbox.svg
 ```
 
+## Recording once and restyling forever
+
+Rebuilding a tape re-runs your command, which takes as long as the command takes and
+depends on the machine still being in the same state. If all you want to change is how
+the recording looks, save the capture instead:
+
+```
+ttysvg record --out demo.svg --save demo.json -- cargo build
+```
+
+`demo.json` holds the terminal frames and their timing, not the SVG. Every style and
+timing choice can then be replayed against it with no terminal involved:
+
+```
+ttysvg render demo.json --theme gruvbox
+ttysvg render demo.json --speed 2 --window --title "cargo build"
+ttysvg render demo.json --info
+```
+
+This is the difference between a two second loop and a two minute one. Rendering reads
+the saved frames straight from disk, so it finishes in milliseconds however long the
+original command took. Re-rendering with no flags reproduces the original SVG byte for
+byte, because the recording stored the settings it was made with.
+
+Both other commands can save one, and `--save` on its own skips the SVG entirely:
+
+```
+ttysvg record --save session.json -- ./my-tool
+ttysvg build demo.tape --save demo.json
+```
+
 ## Command reference
 
 ### ttysvg record
@@ -127,6 +158,7 @@ Captures a live session. Stops when the program exits.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--out` | `demo.svg` | Output path |
+| `--save` | off | Also write the raw capture, for `ttysvg render` |
 | `--cols` `--rows` | your terminal size | Recording size in characters |
 | `--theme` | `tokyonight` | Theme name or path to a theme file |
 | `--font` | system monospace stack | CSS font family used in the output |
@@ -150,10 +182,26 @@ Runs a tape. Any flag given here overrides the tape.
 | Flag | Meaning |
 |---|---|
 | `--out` | Output path |
+| `--save` | Also write the raw capture, for `ttysvg render` |
 | `--theme` | Theme name or path |
 | `--speed` | Playback multiplier |
 | `--window` | Force the title bar on |
 | `--title` | Title bar text |
+
+### ttysvg render
+
+Rebuilds an SVG from a saved capture. Nothing is executed. Anything not given keeps the
+value the recording was made with.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--out` | the capture path with an `.svg` extension | Output path |
+| `--info` | off | Print what the capture holds and exit |
+| `--theme` `--font` `--font-size` | as recorded | Same meaning as on `record` |
+| `--padding` `--advance` `--line-height` | as recorded | Same meaning as on `record` |
+| `--trim-idle` `--speed` `--tail` | as recorded | Retime without re-running anything |
+| `--window` `--no-window` `--title` | as recorded | Title bar, either direction |
+| `--no-loop` | as recorded | Play once instead of looping |
 
 ### ttysvg themes
 
@@ -265,6 +313,7 @@ Where things live:
 src/capture/    spawning a pty, reading it, running a tape against it
 src/term/       terminal grid to Frame, the platform independent boundary
 src/optimize.rs dedupe, trim idle, quantize, speed, tail
+src/session.rs  saving and loading a capture, so it can be re-rendered
 src/svg/        the emitter, themes, escaping
 src/tape/       tape tokenizer and directives
 themes/         one TOML file per theme
@@ -300,6 +349,10 @@ and the resulting SVG, and say which terminal and Windows version you are on.
 
 ## Known limits
 
+- **A saved capture cannot be resized.** `ttysvg render` can change every visual and
+  timing setting except `--cols` and `--rows`. A capture stores the terminal grid after
+  wrapping, not the bytes that produced it, so reflowing to a new width would need the
+  recording to be made again.
 - **Character width is assumed, not measured.** The output uses a generic monospace font
   stack and assumes each character is 0.6 times the font size wide. If text drifts to the
   right across a long line, pin it with `--advance` or the `advance` tape directive.
