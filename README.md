@@ -118,6 +118,9 @@ Once you have a tape, rebuilding in a different theme costs nothing:
 ttysvg build demo.tape --theme gruvbox --out demo-gruvbox.svg
 ```
 
+There are complete tapes for nine common situations under [Examples](#examples), from a
+README banner to a full screen TUI to a deploy that must not leak its credentials.
+
 ## Recording once and restyling forever
 
 Rebuilding a tape re-runs your command, which takes as long as the command takes and
@@ -291,6 +294,382 @@ Key directives take an optional repeat count, so `down 3` presses it three times
 Durations accept `ms`, `s` and `m`, and a bare number means milliseconds. Lines
 starting with `#` are comments. Backslashes inside quotes are literal, so Windows
 paths like `type ".\scripts\build.ps1"` work as written.
+
+## Examples
+
+Every block below is a complete tape. Save it as `demo.tape`, run
+`ttysvg build demo.tape`, and adjust the command in the middle to your own. They are
+folded away so this page stays readable, so open only the one that matches what you are
+trying to record.
+
+<details>
+<summary><b>A README banner for a command line tool</b></summary>
+
+The most common case. A fixed size, a clean prompt with no machine name in it, and a
+title bar so it reads as a terminal rather than a screenshot of text.
+
+```tape
+output "docs/banner.svg"
+theme "tokyonight"
+width 78
+height 16
+padding 20
+window on
+title "mytool"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { 'mytool $ ' }; Clear-Host"
+
+type-delay 55ms
+trim-idle 700ms
+tail 2500ms
+
+wait  "mytool $" 20s
+type  "mytool --help"
+enter
+wait  "USAGE" 10s
+sleep 1500ms
+```
+
+The `wait "USAGE"` is doing the real work. It holds until your help text is actually on
+screen, so the recording cannot end early on a slow machine.
+
+</details>
+
+<details>
+<summary><b>A full screen TUI</b></summary>
+
+Anything that draws a whole screen, moves the cursor around and redraws in place. This is
+the case a naive recorder gets wrong, and the reason ttysvg keeps a real terminal grid
+rather than replaying escape sequences.
+
+```tape
+output "docs/tui.svg"
+theme "catppuccin"
+width 100
+height 30
+window on
+title "lazygit"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "Clear-Host"
+
+type-delay 40ms
+trim-idle 500ms
+
+type  "lazygit"
+enter
+sleep 3s
+
+down 3
+sleep 900ms
+right
+sleep 1200ms
+tab
+sleep 1200ms
+
+type  "q"
+sleep 800ms
+```
+
+Give the program time to paint before sending keys. A TUI that is still starting up will
+swallow the first keystroke, and the recording will look like the tool ignored you.
+
+</details>
+
+<details>
+<summary><b>A long build or test run, sped up</b></summary>
+
+Nobody wants to watch ninety seconds of compiler output at real speed, but cutting it
+entirely loses the point. Speed up the playback and clamp the dead air.
+
+```tape
+output "docs/build.svg"
+theme "gruvbox"
+width 100
+height 24
+window on
+title "cargo build --release"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
+
+speed 3.0
+trim-idle 400ms
+tail 3s
+
+wait  "$" 15s
+type  "cargo build --release"
+enter
+wait  "Finished" 300s
+sleep 2s
+```
+
+`speed 3.0` plays the whole thing three times faster. `trim-idle 400ms` separately caps
+every gap, so a linker that stalls for twenty seconds becomes a short pause instead of a
+frozen picture. The generous `300s` on the wait is a safety net, not a delay, since it
+returns the moment the text appears.
+
+</details>
+
+<details>
+<summary><b>An interactive prompt or wizard</b></summary>
+
+Scaffolding tools, `npm init`, anything that asks questions. Arrow keys and enter, with
+pauses so a viewer can read each question before the answer arrives.
+
+```tape
+output "docs/init.svg"
+theme "nord"
+width 84
+height 20
+window on
+title "create-app"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
+
+type-delay 60ms
+
+wait  "$" 15s
+type  "npm create vite@latest"
+enter
+
+wait  "Project name" 30s
+sleep 800ms
+type  "my-app"
+enter
+
+wait  "framework" 20s
+sleep 1s
+down 2
+sleep 700ms
+enter
+
+wait  "variant" 20s
+sleep 900ms
+enter
+sleep 2s
+```
+
+Wait on the question text rather than sleeping a fixed amount. Package managers vary
+wildly in how long they take to show the first prompt.
+
+</details>
+
+<details>
+<summary><b>A REPL session</b></summary>
+
+Language demos, library tutorials, anything where the output of one line motivates the
+next. A slower type delay makes it feel like a person is typing.
+
+```tape
+output "docs/repl.svg"
+theme "tokyonight"
+width 76
+height 18
+padding 22
+
+shell "python" "-q"
+
+type-delay 75ms
+trim-idle 600ms
+tail 3s
+
+wait  ">>>" 15s
+type  "import mylib"
+enter
+sleep 600ms
+
+type  "mylib.parse('2 + 2 * 3')"
+enter
+wait  "8" 10s
+sleep 1200ms
+
+type  "mylib.explain(_)"
+enter
+sleep 2s
+```
+
+Note the shell is the REPL itself, with no wrapper. `wait ">>>"` catches the banner
+finishing, and `wait "8"` proves the evaluation actually happened.
+
+</details>
+
+<details>
+<summary><b>A deploy or anything holding credentials</b></summary>
+
+The case where getting it wrong publishes a key. Redaction runs before anything is
+written, so the secret is never in the SVG or in a saved capture.
+
+```tape
+output "docs/deploy.svg"
+theme "gruvbox"
+width 92
+height 20
+window on
+title "deploy"
+
+sanitize on
+redact "sk-[A-Za-z0-9]+"
+redact "ghp_[A-Za-z0-9]+"
+redact "Bearer [A-Za-z0-9._-]+"
+redact "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
+
+wait  "$" 15s
+type  "./deploy.ps1 --env production"
+enter
+wait  "deployed" 120s
+sleep 2s
+```
+
+`sanitize on` covers your home directory, username and hostname without a regex. The
+patterns cover the rest, including the server address. Open the finished SVG and read it
+before pushing, since a secret split across two colors by a syntax highlighter is not
+matched.
+
+</details>
+
+<details>
+<summary><b>Explaining an error, not just a success</b></summary>
+
+The most useful recordings in a bug report or a tutorial show the failure first. Two
+commands in one take, with a pause long enough to read the message.
+
+```tape
+output "docs/fix.svg"
+theme "catppuccin"
+width 88
+height 22
+window on
+title "the fix"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
+
+type-delay 50ms
+trim-idle 800ms
+tail 4s
+
+wait  "$" 15s
+type  "mytool build"
+enter
+wait  "error" 60s
+sleep 2500ms
+
+type  "mytool build --target wasm32-unknown-unknown"
+enter
+wait  "Finished" 120s
+sleep 2s
+```
+
+The long `tail 4s` holds the final state before the loop restarts, so the resolution is
+on screen long enough to register.
+
+</details>
+
+<details>
+<summary><b>A git workflow</b></summary>
+
+Several short commands where the interesting part is the sequence rather than any one
+output.
+
+```tape
+output "docs/git.svg"
+theme "nord"
+width 92
+height 24
+window on
+title "git"
+
+shell "powershell.exe" "-NoLogo" "-NoProfile" "-NoExit" "-Command" "function prompt { '$ ' }; Clear-Host"
+
+type-delay 45ms
+trim-idle 500ms
+
+wait  "$" 15s
+type  "git status --short"
+enter
+sleep 1500ms
+
+type  "git add -A"
+enter
+sleep 800ms
+
+type  "git commit -m \"add the parser\""
+enter
+sleep 1800ms
+
+type  "git log --oneline -5"
+enter
+sleep 2500ms
+```
+
+Note the escaped quotes inside the commit message. Only `\"` and `\\` are escapes, so
+Windows paths stay literal.
+
+</details>
+
+<details>
+<summary><b>Linux and macOS</b></summary>
+
+Same tool, different shell line. Everything after the terminal parser is platform
+independent, so the rest of the tape is unchanged.
+
+```tape
+output "docs/demo-linux.svg"
+theme "tokyonight"
+width 84
+height 20
+window on
+title "mytool"
+
+shell "bash" "--norc" "-i"
+
+type-delay 55ms
+trim-idle 700ms
+tail 2500ms
+
+wait  "$" 15s
+type  "export PS1='mytool $ ' && clear"
+enter
+sleep 600ms
+
+type  "mytool --help"
+enter
+wait  "USAGE" 15s
+sleep 1500ms
+```
+
+`--norc` keeps someone else's prompt theme out of your recording. Setting `PS1` and
+clearing gives the same neutral prompt the Windows examples build with `function prompt`.
+
+</details>
+
+<details>
+<summary><b>One recording, every theme</b></summary>
+
+This one is not a tape. Record once, then render the same frames repeatedly. Useful for
+picking a theme, and for a docs page that shows all of them without recording four times.
+
+```
+ttysvg record --save session.json --out docs/demo.svg -- mytool --help
+
+ttysvg render session.json --theme tokyonight --out docs/tokyonight.svg
+ttysvg render session.json --theme catppuccin --out docs/catppuccin.svg
+ttysvg render session.json --theme gruvbox    --out docs/gruvbox.svg
+ttysvg render session.json --theme nord       --out docs/nord.svg
+```
+
+Each render takes milliseconds because nothing is executed. The same trick gives you a
+wide social preview and a compact README banner from one take:
+
+```
+ttysvg render session.json --font-size 18 --padding 32 --out docs/social.svg
+ttysvg render session.json --font-size 12 --padding 12 --no-loop --out docs/inline.svg
+```
+
+Everything except `--cols` and `--rows` can change after the fact. Those are fixed at
+record time because the text has already wrapped.
+
+</details>
 
 ## Themes
 
