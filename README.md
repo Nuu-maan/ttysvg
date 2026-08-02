@@ -191,7 +191,9 @@ ttysvg record --sanitize --redact "sk-[A-Za-z0-9]+" --out demo.svg -- ./deploy
 
 `--sanitize` handles the boring case with no regex. It rewrites your home directory to
 `~`, and replaces your username and hostname with `user` and `host`. That alone covers
-most of what makes people delete a demo and record it again.
+most of what makes people delete a demo and record it again. Its matching is case
+insensitive, because a tool will happily print your hostname with different
+capitalization than the environment variable holds.
 
 `--redact` takes a regex and masks every match with `*`, and can be repeated. Use it for
 anything shaped like a secret:
