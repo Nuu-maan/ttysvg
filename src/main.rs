@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -7,6 +7,7 @@ use clap::{Args, Parser, Subcommand};
 
 use ttysvg::capture::{self, driver};
 use ttysvg::optimize::{self, Options};
+use ttysvg::session::Capture;
 use ttysvg::svg::theme::Theme;
 use ttysvg::svg::{render, RenderOpts};
 use ttysvg::tape::{self, Config, DEFAULT_FONT};
@@ -27,6 +28,7 @@ struct Cli {
 enum Cmd {
     Record(RecordArgs),
     Build(BuildArgs),
+    Render(RenderArgs),
     Themes,
 }
 
@@ -54,8 +56,10 @@ struct StyleArgs {
 
 #[derive(Args)]
 struct RecordArgs {
-    #[arg(short, long, default_value = "demo.svg")]
-    out: PathBuf,
+    #[arg(short, long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    save: Option<PathBuf>,
     #[arg(long)]
     cols: Option<u16>,
     #[arg(long)]
@@ -78,6 +82,8 @@ struct BuildArgs {
     #[arg(short, long)]
     out: Option<PathBuf>,
     #[arg(long)]
+    save: Option<PathBuf>,
+    #[arg(long)]
     theme: Option<String>,
     #[arg(long)]
     speed: Option<f64>,
@@ -87,11 +93,47 @@ struct BuildArgs {
     title: Option<String>,
 }
 
+#[derive(Args)]
+struct RenderArgs {
+    session: PathBuf,
+    #[arg(short, long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    theme: Option<String>,
+    #[arg(long)]
+    font: Option<String>,
+    #[arg(long = "font-size")]
+    font_size: Option<f64>,
+    #[arg(long)]
+    advance: Option<f64>,
+    #[arg(long = "line-height")]
+    line_height: Option<f64>,
+    #[arg(long)]
+    padding: Option<f64>,
+    #[arg(long = "trim-idle")]
+    trim_idle: Option<String>,
+    #[arg(long)]
+    speed: Option<f64>,
+    #[arg(long)]
+    tail: Option<String>,
+    #[arg(long)]
+    window: bool,
+    #[arg(long = "no-window")]
+    no_window: bool,
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long = "no-loop")]
+    no_loop: bool,
+    #[arg(long)]
+    info: bool,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Record(a) => record(a),
         Cmd::Build(a) => build(a),
+        Cmd::Render(a) => rerender(a),
         Cmd::Themes => {
             for name in Theme::names() {
                 println!("{name}");
@@ -129,8 +171,10 @@ fn record(a: RecordArgs) -> Result<()> {
     let cols = a.cols.unwrap_or(term_cols.clamp(20, 200));
     let rows = a.rows.unwrap_or(term_rows.clamp(6, 60));
 
+    let want_svg = a.out.is_some() || a.save.is_none();
+
     let mut cfg = config_from(&a.style);
-    cfg.output = a.out.clone();
+    cfg.output = a.out.clone().unwrap_or_else(|| PathBuf::from("demo.svg"));
     cfg.cols = cols;
     cfg.rows = rows;
     cfg.trim_idle = trim_opt(&a.trim_idle)?;
@@ -175,7 +219,31 @@ fn record(a: RecordArgs) -> Result<()> {
     }
 
     let frames = session.collect();
+
+    if let Some(path) = &a.save {
+        save_capture(path, &a.command, &cfg, &frames)?;
+    }
+    if !want_svg {
+        return Ok(());
+    }
     emit(&cfg, theme, &frames)
+}
+
+fn save_capture(
+    path: &Path,
+    command: &[String],
+    cfg: &Config,
+    frames: &[(Duration, Frame)],
+) -> Result<()> {
+    let capture = Capture::new(command, cfg, frames);
+    let bytes = capture.save(path)?;
+    eprintln!(
+        "ttysvg: saved {} ({} frames, {})",
+        path.display(),
+        capture.shots.len(),
+        human_size(bytes)
+    );
+    Ok(())
 }
 
 fn build(a: BuildArgs) -> Result<()> {
@@ -222,7 +290,73 @@ fn build(a: BuildArgs) -> Result<()> {
     let frames = session.finish(cfg.tail);
     result?;
 
+    if let Some(path) = &a.save {
+        save_capture(path, &cfg.shell, &cfg, &frames)?;
+    }
+
     emit(&cfg, theme, &frames)
+}
+
+fn rerender(a: RenderArgs) -> Result<()> {
+    let capture = Capture::load(&a.session)?;
+    let mut cfg = capture.config.clone();
+
+    if a.info {
+        eprintln!("command    {}", capture.command.join(" "));
+        eprintln!("size       {}x{}", cfg.cols, cfg.rows);
+        eprintln!("frames     {}", capture.shots.len());
+        eprintln!(
+            "span       {:.1}s",
+            capture.shots.last().map(|s| s.at_ms).unwrap_or(0) as f64 / 1000.0
+        );
+        eprintln!("theme      {}", cfg.theme);
+        return Ok(());
+    }
+
+    if let Some(v) = a.theme {
+        cfg.theme = v;
+    }
+    if let Some(v) = a.font {
+        cfg.font_family = v;
+    }
+    if let Some(v) = a.font_size {
+        cfg.font_size = v;
+    }
+    if let Some(v) = a.advance {
+        cfg.advance = v;
+    }
+    if let Some(v) = a.line_height {
+        cfg.line_height = v;
+    }
+    if let Some(v) = a.padding {
+        cfg.padding = v;
+    }
+    if let Some(v) = a.trim_idle {
+        cfg.trim_idle = trim_opt(&v)?;
+    }
+    if let Some(v) = a.speed {
+        cfg.speed = v;
+    }
+    if let Some(v) = a.tail {
+        cfg.tail = tape::parse::duration(&v)?;
+    }
+    if let Some(v) = a.title {
+        cfg.title = v;
+    }
+    if a.window {
+        cfg.window = true;
+    }
+    if a.no_window {
+        cfg.window = false;
+    }
+    if a.no_loop {
+        cfg.loop_forever = false;
+    }
+
+    cfg.output = a.out.unwrap_or_else(|| a.session.with_extension("svg"));
+
+    let theme = load_theme(&cfg.theme)?;
+    emit(&cfg, theme, &capture.frames())
 }
 
 fn load_theme(name: &str) -> Result<Theme> {
