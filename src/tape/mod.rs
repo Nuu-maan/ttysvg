@@ -5,6 +5,8 @@ pub use parse::parse;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Key {
     Enter,
@@ -27,7 +29,8 @@ pub enum Op {
     Wait { text: String, timeout: Duration },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub output: PathBuf,
     pub theme: String,
