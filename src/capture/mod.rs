@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Result};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 
+use crate::redact::Rules;
 use crate::term::{self, Frame};
 
 const DRAIN_GRACE: Duration = Duration::from_millis(200);
@@ -30,7 +31,7 @@ pub struct Session {
     reader: Option<std::thread::JoinHandle<()>>,
 }
 
-pub fn spawn(argv: &[String], cols: u16, rows: u16, echo: bool) -> Result<Session> {
+pub fn spawn(argv: &[String], cols: u16, rows: u16, echo: bool, rules: &Rules) -> Result<Session> {
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| anyhow!("no command given"))?;
@@ -68,6 +69,7 @@ pub fn spawn(argv: &[String], cols: u16, rows: u16, echo: bool) -> Result<Sessio
 
     let start = Instant::now();
     let sink = Arc::clone(&shared);
+    let rules = rules.clone();
 
     let handle = std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
@@ -85,7 +87,8 @@ pub fn spawn(argv: &[String], cols: u16, rows: u16, echo: bool) -> Result<Sessio
 
                     let mut s = sink.lock().unwrap();
                     s.parser.process(&buf[..n]);
-                    let frame = term::snapshot(s.parser.screen());
+                    let mut frame = term::snapshot(s.parser.screen());
+                    rules.frame(&mut frame);
                     if s.frames
                         .last()
                         .map(|(_, prev)| prev != &frame)

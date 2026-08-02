@@ -1,9 +1,10 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::redact::Rules;
 use crate::tape::Config;
 use crate::term::Frame;
 
@@ -24,20 +25,33 @@ pub struct Capture {
 }
 
 impl Capture {
-    pub fn new(command: &[String], config: &Config, raw: &[(Duration, Frame)]) -> Self {
+    pub fn new(
+        command: &[String],
+        config: &Config,
+        raw: &[(Duration, Frame)],
+        rules: &Rules,
+    ) -> Self {
         let mut shots: Vec<Shot> = Vec::with_capacity(raw.len());
         for (at, frame) in raw {
-            if shots.last().map(|s| s.frame != *frame).unwrap_or(true) {
+            let mut frame = frame.clone();
+            rules.frame(&mut frame);
+            if shots.last().map(|s| s.frame != frame).unwrap_or(true) {
                 shots.push(Shot {
                     at_ms: at.as_millis() as u64,
-                    frame: frame.clone(),
+                    frame,
                 });
             }
         }
+
+        let mut config = config.clone();
+        config.shell = rules.strings(&config.shell);
+        config.title = rules.text(&config.title);
+        config.output = PathBuf::from(rules.text(&config.output.to_string_lossy()));
+
         Capture {
             format: FORMAT,
-            command: command.to_vec(),
-            config: config.clone(),
+            command: rules.strings(command),
+            config,
             shots,
         }
     }
