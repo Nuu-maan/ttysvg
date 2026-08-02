@@ -10,6 +10,26 @@ fn conv_color(c: vt100::Color) -> Color {
     }
 }
 
+fn trim_trailing(runs: &mut Vec<Run>) {
+    while let Some(last) = runs.last_mut() {
+        if !last.style.is_blank() {
+            break;
+        }
+        let keep = last.text.trim_end_matches(' ').len();
+        let dropped = last.text.len() - keep;
+        if dropped == 0 {
+            break;
+        }
+        last.text.truncate(keep);
+        last.width = last.width.saturating_sub(dropped as u16);
+        if last.text.is_empty() {
+            runs.pop();
+        } else {
+            break;
+        }
+    }
+}
+
 pub fn snapshot(screen: &vt100::Screen) -> Frame {
     let (rows, cols) = screen.size();
     let mut out = Vec::with_capacity(rows as usize);
@@ -66,6 +86,7 @@ pub fn snapshot(screen: &vt100::Screen) -> Frame {
         }
 
         runs.retain(|run| !(run.style.is_blank() && run.text.trim().is_empty()));
+        trim_trailing(&mut runs);
 
         out.push(Row { runs });
     }
