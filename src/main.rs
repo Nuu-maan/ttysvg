@@ -7,6 +7,7 @@ use clap::{Args, Parser, Subcommand};
 
 use ttysvg::capture::{self, driver};
 use ttysvg::optimize::{self, Options};
+use ttysvg::redact::Rules;
 use ttysvg::session::Capture;
 use ttysvg::svg::theme::Theme;
 use ttysvg::svg::{render, RenderOpts};
@@ -55,6 +56,23 @@ struct StyleArgs {
 }
 
 #[derive(Args)]
+struct PrivacyArgs {
+    #[arg(long)]
+    redact: Vec<String>,
+    #[arg(long)]
+    sanitize: bool,
+}
+
+impl PrivacyArgs {
+    fn merge_into(&self, cfg: &mut Config) {
+        cfg.redact.extend(self.redact.iter().cloned());
+        if self.sanitize {
+            cfg.sanitize = true;
+        }
+    }
+}
+
+#[derive(Args)]
 struct RecordArgs {
     #[arg(short, long)]
     out: Option<PathBuf>,
@@ -72,6 +90,8 @@ struct RecordArgs {
     tail: String,
     #[command(flatten)]
     style: StyleArgs,
+    #[command(flatten)]
+    privacy: PrivacyArgs,
     #[arg(last = true, required = true)]
     command: Vec<String>,
 }
@@ -91,6 +111,8 @@ struct BuildArgs {
     window: bool,
     #[arg(long)]
     title: Option<String>,
+    #[command(flatten)]
+    privacy: PrivacyArgs,
 }
 
 #[derive(Args)]
@@ -126,6 +148,8 @@ struct RenderArgs {
     no_loop: bool,
     #[arg(long)]
     info: bool,
+    #[command(flatten)]
+    privacy: PrivacyArgs,
 }
 
 fn main() -> Result<()> {
@@ -180,17 +204,19 @@ fn record(a: RecordArgs) -> Result<()> {
     cfg.trim_idle = trim_opt(&a.trim_idle)?;
     cfg.tail = tape::parse::duration(&a.tail)?;
     cfg.speed = a.speed;
+    a.privacy.merge_into(&mut cfg);
 
     let theme = load_theme(&cfg.theme)?;
+    let rules = Rules::from_config(&cfg)?;
 
     eprintln!(
         "ttysvg: recording {} at {}x{}. exit the program to stop.",
-        a.command.join(" "),
+        rules.strings(&a.command).join(" "),
         cols,
         rows
     );
 
-    let mut session = capture::spawn(&a.command, cols, rows, true)?;
+    let mut session = capture::spawn(&a.command, cols, rows, true, &rules)?;
 
     let raw_mode = crossterm::terminal::enable_raw_mode().is_ok();
 
@@ -221,7 +247,7 @@ fn record(a: RecordArgs) -> Result<()> {
     let frames = session.collect();
 
     if let Some(path) = &a.save {
-        save_capture(path, &a.command, &cfg, &frames)?;
+        save_capture(path, &a.command, &cfg, &frames, &rules)?;
     }
     if !want_svg {
         return Ok(());
@@ -234,8 +260,9 @@ fn save_capture(
     command: &[String],
     cfg: &Config,
     frames: &[(Duration, Frame)],
+    rules: &Rules,
 ) -> Result<()> {
-    let capture = Capture::new(command, cfg, frames);
+    let capture = Capture::new(command, cfg, frames, rules);
     let bytes = capture.save(path)?;
     eprintln!(
         "ttysvg: saved {} ({} frames, {})",
@@ -267,6 +294,7 @@ fn build(a: BuildArgs) -> Result<()> {
     if a.window {
         cfg.window = true;
     }
+    a.privacy.merge_into(&mut cfg);
     if out_from_cli.is_none() && cfg.output.is_relative() {
         if let Some(dir) = a.tape.parent() {
             if !dir.as_os_str().is_empty() {
@@ -276,6 +304,7 @@ fn build(a: BuildArgs) -> Result<()> {
     }
 
     let theme = load_theme(&cfg.theme)?;
+    let rules = Rules::from_config(&cfg)?;
 
     eprintln!(
         "ttysvg: building {} ({} ops) at {}x{}",
@@ -285,13 +314,13 @@ fn build(a: BuildArgs) -> Result<()> {
         cfg.rows
     );
 
-    let mut session = capture::spawn(&cfg.shell, cfg.cols, cfg.rows, false)?;
+    let mut session = capture::spawn(&cfg.shell, cfg.cols, cfg.rows, false, &rules)?;
     let result = driver::run(&mut session, &parsed.ops, cfg.type_delay);
     let frames = session.finish(cfg.tail);
     result?;
 
     if let Some(path) = &a.save {
-        save_capture(path, &cfg.shell, &cfg, &frames)?;
+        save_capture(path, &cfg.shell, &cfg, &frames, &rules)?;
     }
 
     emit(&cfg, theme, &frames)
@@ -310,6 +339,17 @@ fn rerender(a: RenderArgs) -> Result<()> {
             capture.shots.last().map(|s| s.at_ms).unwrap_or(0) as f64 / 1000.0
         );
         eprintln!("theme      {}", cfg.theme);
+        eprintln!(
+            "redaction  {}",
+            match (cfg.sanitize, cfg.redact.len()) {
+                (false, 0) => "none".to_string(),
+                (s, n) => format!(
+                    "{} pattern(s), sanitize {}",
+                    n,
+                    if s { "on" } else { "off" }
+                ),
+            }
+        );
         return Ok(());
     }
 
@@ -355,8 +395,20 @@ fn rerender(a: RenderArgs) -> Result<()> {
 
     cfg.output = a.out.unwrap_or_else(|| a.session.with_extension("svg"));
 
+    let mut cleanup = Config::default();
+    a.privacy.merge_into(&mut cleanup);
+    a.privacy.merge_into(&mut cfg);
+
+    let rules = Rules::from_config(&cleanup)?;
+    let mut frames = capture.frames();
+    if !rules.is_empty() {
+        for (_, frame) in &mut frames {
+            rules.frame(frame);
+        }
+    }
+
     let theme = load_theme(&cfg.theme)?;
-    emit(&cfg, theme, &capture.frames())
+    emit(&cfg, theme, &frames)
 }
 
 fn load_theme(name: &str) -> Result<Theme> {
