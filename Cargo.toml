@@ -1,0 +1,27 @@
+[package]
+name = "ttysvg"
+version = "0.1.0"
+edition = "2021"
+description = "Terminal recordings as self-contained animated SVG. Works on Windows."
+license = "MIT"
+repository = "https://github.com/nuu-maan/ttysvg"
+readme = "README.md"
+keywords = ["terminal", "svg", "recording", "conpty", "demo"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+crossterm = "0.28"
+portable-pty = "0.8"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+vt100 = "0.15"
+
+[dev-dependencies]
+insta = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
