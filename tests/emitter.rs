@@ -13,10 +13,7 @@ fn capture(chunks: &[(u64, &str)]) -> Vec<(Duration, Frame)> {
     let mut out = vec![(Duration::ZERO, Frame::blank(ROWS))];
     for (ms, text) in chunks {
         parser.process(text.as_bytes());
-        out.push((
-            Duration::from_millis(*ms),
-            term::snapshot(parser.screen()),
-        ));
+        out.push((Duration::from_millis(*ms), term::snapshot(parser.screen())));
     }
     out
 }

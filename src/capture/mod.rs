@@ -86,7 +86,11 @@ pub fn spawn(argv: &[String], cols: u16, rows: u16, echo: bool) -> Result<Sessio
                     let mut s = sink.lock().unwrap();
                     s.parser.process(&buf[..n]);
                     let frame = term::snapshot(s.parser.screen());
-                    if s.frames.last().map(|(_, prev)| prev != &frame).unwrap_or(true) {
+                    if s.frames
+                        .last()
+                        .map(|(_, prev)| prev != &frame)
+                        .unwrap_or(true)
+                    {
                         s.frames.push((at, frame));
                     }
                 }

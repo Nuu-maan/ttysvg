@@ -14,8 +14,8 @@ pub fn parse(src: &str) -> Result<Tape> {
         if line.is_empty() {
             continue;
         }
-        let toks = tokenize(line)
-            .with_context(|| format!("line {}: {}", lineno + 1, raw.trim()))?;
+        let toks =
+            tokenize(line).with_context(|| format!("line {}: {}", lineno + 1, raw.trim()))?;
         if toks.is_empty() {
             continue;
         }
