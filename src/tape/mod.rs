@@ -49,6 +49,8 @@ pub struct Config {
     pub window: bool,
     pub title: String,
     pub loop_forever: bool,
+    pub redact: Vec<String>,
+    pub sanitize: bool,
 }
 
 pub fn default_shell() -> Vec<String> {
@@ -87,6 +89,8 @@ impl Default for Config {
             window: false,
             title: String::new(),
             loop_forever: true,
+            redact: Vec::new(),
+            sanitize: false,
         }
     }
 }

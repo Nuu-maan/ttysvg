@@ -9,7 +9,7 @@ pub fn parse(src: &str) -> Result<Tape> {
     let mut config = Config::default();
     let mut ops = Vec::new();
 
-    for (lineno, raw) in src.lines().enumerate() {
+    for (lineno, raw) in src.trim_start_matches('\u{feff}').lines().enumerate() {
         let line = strip_comment(raw).trim();
         if line.is_empty() {
             continue;
@@ -156,6 +156,8 @@ fn apply(cfg: &mut Config, ops: &mut Vec<Op>, toks: &[String]) -> Result<()> {
         "window" => cfg.window = flag(arg(toks, 1, "on or off")?)?,
         "title" => cfg.title = arg(toks, 1, "a string")?.to_string(),
         "loop" => cfg.loop_forever = flag(arg(toks, 1, "on or off")?)?,
+        "redact" => cfg.redact.push(arg(toks, 1, "a pattern")?.to_string()),
+        "sanitize" => cfg.sanitize = flag(arg(toks, 1, "on or off")?)?,
 
         "type" => ops.push(Op::Type(arg(toks, 1, "a string")?.to_string())),
         "sleep" => ops.push(Op::Sleep(duration(arg(toks, 1, "a duration")?)?)),
@@ -246,6 +248,13 @@ mod tests {
     fn empty_string_is_a_token() {
         let toks = tokenize(r#"title """#).unwrap();
         assert_eq!(toks, vec!["title", ""]);
+    }
+
+    #[test]
+    fn a_byte_order_mark_is_ignored() {
+        let tape = parse("\u{feff}width 72\ntype \"ls\"\n").unwrap();
+        assert_eq!(tape.config.cols, 72);
+        assert_eq!(tape.ops.len(), 1);
     }
 
     #[test]
