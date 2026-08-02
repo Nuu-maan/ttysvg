@@ -152,6 +152,33 @@ ttysvg record --save session.json -- ./my-tool
 ttysvg build demo.tape --save demo.json
 ```
 
+## Posting it somewhere that will not take an SVG
+
+An SVG is the right format for a README and the wrong one nearly everywhere else. Social
+sites, chat apps and issue trackers mostly reject it. `--gif` and `--png` cover that,
+and work on all three commands:
+
+```
+ttysvg build demo.tape --gif demo.gif
+ttysvg render session.json --gif demo.gif --scale 2
+ttysvg record --png shot.png -- ./my-tool
+```
+
+`--gif` rasterizes every frame and encodes them with the timing the animation already
+has, so the result plays exactly like the SVG. `--png` writes a single still of the last
+frame, which is what you want for a thumbnail or a screenshot.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--gif` | off | Also write an animated GIF |
+| `--png` | off | Also write a still PNG of the last frame |
+| `--scale` | `1` | Multiply the pixel size, so `2` gives a retina bitmap |
+| `--light` | off | Rasterize the light palette instead of the dark one |
+
+Raster output has to commit to one palette, since a bitmap cannot carry the light and
+dark switch the SVG has. Dark is used unless you pass `--light`. The SVG is still written
+either way, so you can keep the theme aware version for your README and post the GIF.
+
 ## Recording something real
 
 A recording is a publishing format. Whatever was on screen ends up in a file that goes
@@ -210,6 +237,8 @@ Captures a live session. Stops when the program exits.
 | `--save` | off | Also write the raw capture, for `ttysvg render` |
 | `--redact` | none | Mask everything matching this regex, repeatable |
 | `--sanitize` | off | Rewrite the home directory, username and hostname |
+| `--gif` `--png` | off | Also write raster output, see above |
+| `--scale` `--light` | `1`, off | Raster size multiplier and palette |
 | `--cols` `--rows` | your terminal size | Recording size in characters |
 | `--theme` | `tokyonight` | Theme name or path to a theme file |
 | `--font` | system monospace stack | CSS font family used in the output |
@@ -235,6 +264,7 @@ Runs a tape. Any flag given here overrides the tape.
 | `--out` | Output path |
 | `--save` | Also write the raw capture, for `ttysvg render` |
 | `--redact` `--sanitize` | Added to whatever the tape already sets |
+| `--gif` `--png` `--scale` `--light` | Raster output, see above |
 | `--theme` | Theme name or path |
 | `--speed` | Playback multiplier |
 | `--window` | Force the title bar on |
@@ -255,6 +285,7 @@ value the recording was made with.
 | `--window` `--no-window` `--title` | as recorded | Title bar, either direction |
 | `--no-loop` | as recorded | Play once instead of looping |
 | `--redact` `--sanitize` | none | Clean a capture that was recorded without them |
+| `--gif` `--png` `--scale` `--light` | off | Raster output, see above |
 
 ### ttysvg themes
 
@@ -821,6 +852,7 @@ Where things live:
 src/capture/    spawning a pty, reading it, running a tape against it
 src/term/       terminal grid to Frame, the platform independent boundary
 src/optimize.rs dedupe, trim idle, quantize, speed, tail
+src/raster.rs   gif and png output, one frame at a time through resvg
 src/redact.rs   masking secrets and rewriting paths before anything is written
 src/session.rs  saving and loading a capture, so it can be re-rendered
 src/svg/        the emitter, themes, escaping
