@@ -77,6 +77,14 @@ struct BuildArgs {
     tape: PathBuf,
     #[arg(short, long)]
     out: Option<PathBuf>,
+    #[arg(long)]
+    theme: Option<String>,
+    #[arg(long)]
+    speed: Option<f64>,
+    #[arg(long)]
+    window: bool,
+    #[arg(long)]
+    title: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -175,10 +183,23 @@ fn build(a: BuildArgs) -> Result<()> {
         .with_context(|| format!("reading tape {}", a.tape.display()))?;
     let parsed = tape::parse(&src)?;
     let mut cfg = parsed.config;
+    let out_from_cli = a.out.clone();
     if let Some(out) = a.out {
         cfg.output = out;
     }
-    if cfg.output.is_relative() {
+    if let Some(theme) = a.theme {
+        cfg.theme = theme;
+    }
+    if let Some(speed) = a.speed {
+        cfg.speed = speed;
+    }
+    if let Some(title) = a.title {
+        cfg.title = title;
+    }
+    if a.window {
+        cfg.window = true;
+    }
+    if out_from_cli.is_none() && cfg.output.is_relative() {
         if let Some(dir) = a.tape.parent() {
             if !dir.as_os_str().is_empty() {
                 cfg.output = dir.join(&cfg.output);
