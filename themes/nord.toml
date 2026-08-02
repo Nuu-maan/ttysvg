@@ -1,0 +1,21 @@
+name = "nord"
+
+[dark]
+fg = "#d8dee9"
+bg = "#2e3440"
+ansi = [
+  "#3b4252", "#bf616a", "#a3be8c", "#ebcb8b",
+  "#81a1c1", "#b48ead", "#88c0d0", "#e5e9f0",
+  "#4c566a", "#bf616a", "#a3be8c", "#ebcb8b",
+  "#81a1c1", "#b48ead", "#8fbcbb", "#eceff4",
+]
+
+[light]
+fg = "#2e3440"
+bg = "#eceff4"
+ansi = [
+  "#4c566a", "#99324b", "#4f894c", "#a08822",
+  "#3b6ea8", "#97365b", "#398eac", "#d8dee9",
+  "#5e81ac", "#bf616a", "#a3be8c", "#ebcb8b",
+  "#81a1c1", "#b48ead", "#88c0d0", "#2e3440",
+]
