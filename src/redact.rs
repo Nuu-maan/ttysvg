@@ -48,7 +48,7 @@ impl Rules {
     }
 
     fn push_literal(&mut self, pattern: &str, with: &str) {
-        if let Ok(re) = Regex::new(pattern) {
+        if let Ok(re) = Regex::new(&format!("(?i){pattern}")) {
             self.rules.push(Rule {
                 re,
                 with: Some(with.to_string()),

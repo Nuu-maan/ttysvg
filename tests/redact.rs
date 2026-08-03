@@ -89,6 +89,24 @@ fn rules_apply_in_order_so_paths_win_over_usernames() {
 }
 
 #[test]
+fn sanitize_ignores_case() {
+    let mut rules = Rules::default();
+    rules.replace("C:\\Users\\numan", "~");
+    rules.replace_word("NUMAN", "host");
+
+    assert_eq!(rules.text("user@Numan"), "user@host");
+    assert_eq!(rules.text("user@numan"), "user@host");
+    assert_eq!(rules.text("C:\\USERS\\NUMAN\\src"), "~\\src");
+}
+
+#[test]
+fn a_supplied_pattern_stays_case_sensitive() {
+    let rules = with_pattern("sk-[a-z0-9]+");
+    assert_eq!(rules.text("sk-abc"), "******");
+    assert_eq!(rules.text("SK-ABC"), "SK-ABC");
+}
+
+#[test]
 fn no_rules_means_no_change() {
     let rules = Rules::default();
     assert!(rules.is_empty());

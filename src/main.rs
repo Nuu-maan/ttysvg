@@ -6,24 +6,26 @@ use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 
 use ttysvg::capture::{self, driver};
-use ttysvg::optimize::{self, Options};
+use ttysvg::emit::{human_size, load_theme, write as write_out};
 use ttysvg::raster;
 use ttysvg::redact::Rules;
 use ttysvg::session::Capture;
+use ttysvg::svg::render;
 use ttysvg::svg::theme::Theme;
-use ttysvg::svg::{render, RenderOpts};
 use ttysvg::tape::{self, Config, DEFAULT_FONT};
 use ttysvg::term::Frame;
+use ttysvg::ui;
 
 #[derive(Parser)]
 #[command(
     name = "ttysvg",
     version,
-    about = "Terminal recordings as self-contained animated SVG"
+    about = "Terminal recordings as self-contained animated SVG",
+    after_help = "Run ttysvg with no arguments to build a recording step by step."
 )]
 struct Cli {
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
@@ -174,10 +176,14 @@ struct RenderArgs {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Record(a) => record(a),
-        Cmd::Build(a) => build(a),
-        Cmd::Render(a) => rerender(a),
-        Cmd::Themes => {
+        None => {
+            ui::install_panic_hook();
+            ui::run()
+        }
+        Some(Cmd::Record(a)) => record(a),
+        Some(Cmd::Build(a)) => build(a),
+        Some(Cmd::Render(a)) => rerender(a),
+        Some(Cmd::Themes) => {
             for name in Theme::names() {
                 println!("{name}");
             }
@@ -430,45 +436,19 @@ fn rerender(a: RenderArgs) -> Result<()> {
     emit(&cfg, theme, &frames, &a.raster)
 }
 
-fn load_theme(name: &str) -> Result<Theme> {
-    let theme = Theme::load(name)?;
-    theme.validate()?;
-    Ok(theme)
-}
-
 fn emit(
     cfg: &Config,
     theme: Theme,
     raw: &[(Duration, Frame)],
     raster_args: &RasterArgs,
 ) -> Result<()> {
-    let opts = Options {
-        trim_idle: cfg.trim_idle,
-        tail: cfg.tail,
-        speed: cfg.speed,
-        ..Options::default()
-    };
-    let tl = optimize::optimize(raw, &opts);
+    let tl = ttysvg::emit::timeline(raw, cfg);
 
     if tl.is_empty() {
         anyhow::bail!("captured no frames, nothing to render");
     }
 
-    let render_opts = RenderOpts {
-        theme,
-        font_family: cfg.font_family.clone(),
-        font_size: cfg.font_size,
-        advance: cfg.advance,
-        line_height: cfg.line_height,
-        padding: cfg.padding,
-        window: cfg.window,
-        title: cfg.title.clone(),
-        cols: cfg.cols,
-        rows: cfg.rows,
-        loop_forever: cfg.loop_forever,
-        literal: None,
-    }
-    .with_metrics();
+    let render_opts = ttysvg::emit::opts(cfg, theme);
 
     let svg = render(&tl, &render_opts);
 
@@ -510,23 +490,4 @@ fn emit(
     }
 
     Ok(())
-}
-
-fn write_out(path: &Path, bytes: &[u8]) -> Result<()> {
-    if let Some(dir) = path.parent() {
-        if !dir.as_os_str().is_empty() {
-            std::fs::create_dir_all(dir)?;
-        }
-    }
-    std::fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
-}
-
-fn human_size(bytes: usize) -> String {
-    if bytes < 1024 {
-        format!("{bytes} B")
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-    }
 }
