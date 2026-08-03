@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod emit;
 pub mod optimize;
 pub mod raster;
 pub mod redact;
