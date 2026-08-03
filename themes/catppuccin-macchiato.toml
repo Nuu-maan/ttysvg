@@ -1,0 +1,29 @@
+name = "catppuccin-macchiato"
+
+[dark]
+fg = "#cad3f5"
+bg = "#24273a"
+cursor = "#f4dbd6"
+chrome = "#1e2030"
+border = "#363a4f"
+buttons = ["#ed8796", "#eed49f", "#a6da95"]
+ansi = [
+  "#494d64", "#ed8796", "#a6da95", "#eed49f",
+  "#8aadf4", "#f5bde6", "#8bd5ca", "#b8c0e0",
+  "#5b6078", "#ed8796", "#a6da95", "#eed49f",
+  "#8aadf4", "#f5bde6", "#8bd5ca", "#a5adcb",
+]
+
+[light]
+fg = "#4c4f69"
+bg = "#eff1f5"
+cursor = "#dc8a78"
+chrome = "#e6e9ef"
+border = "#ccd0da"
+buttons = ["#d20f39", "#df8e1d", "#40a02b"]
+ansi = [
+  "#5c5f77", "#d20f39", "#40a02b", "#df8e1d",
+  "#1e66f5", "#ea76cb", "#179299", "#acb0be",
+  "#6c6f85", "#d20f39", "#40a02b", "#df8e1d",
+  "#1e66f5", "#ea76cb", "#179299", "#bcc0cc",
+]

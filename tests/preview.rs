@@ -126,7 +126,7 @@ fn the_sample_frame_renders_under_every_theme() {
     let frame = preview::sample();
     for name in Theme::names() {
         let theme = Theme::load(name).unwrap();
-        for p in [&theme.dark, &theme.light] {
+        for p in [&theme.dark, theme.light()] {
             let lines = preview::lines(&frame, p, 60, 6);
             assert_eq!(lines.len(), 6);
             assert!(lines.iter().all(|l| l.width() == 60));

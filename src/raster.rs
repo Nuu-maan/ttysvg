@@ -23,7 +23,7 @@ fn still(frame: &Frame) -> Timeline {
 fn flattened(opts: &RenderOpts, light: bool) -> RenderOpts {
     let mut out = opts.clone();
     out.literal = Some(if light {
-        opts.theme.light.clone()
+        opts.theme.light().clone()
     } else {
         opts.theme.dark.clone()
     });

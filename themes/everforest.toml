@@ -1,0 +1,29 @@
+name = "everforest"
+
+[dark]
+fg = "#d3c6aa"
+bg = "#2d353b"
+cursor = "#d3c6aa"
+chrome = "#232a2e"
+border = "#475258"
+buttons = ["#e67e80", "#dbbc7f", "#a7c080"]
+ansi = [
+  "#343f44", "#e67e80", "#a7c080", "#dbbc7f",
+  "#7fbbb3", "#d699b6", "#83c092", "#d3c6aa",
+  "#475258", "#e67e80", "#a7c080", "#dbbc7f",
+  "#7fbbb3", "#d699b6", "#83c092", "#e8e0cc",
+]
+
+[light]
+fg = "#5c6a72"
+bg = "#fdf6e3"
+cursor = "#5c6a72"
+chrome = "#f4f0d9"
+border = "#e0dcc7"
+buttons = ["#f85552", "#dfa000", "#8da101"]
+ansi = [
+  "#e0dcc7", "#f85552", "#8da101", "#dfa000",
+  "#3a94c5", "#df69ba", "#35a77c", "#5c6a72",
+  "#939f91", "#f85552", "#8da101", "#dfa000",
+  "#3a94c5", "#df69ba", "#35a77c", "#4f585e",
+]

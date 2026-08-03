@@ -1,3 +1,4 @@
+pub mod import;
 pub mod text;
 pub mod theme;
 
@@ -60,24 +61,22 @@ pub fn render(tl: &Timeline, o: &RenderOpts) -> String {
 
     s.push_str("<style>");
     if o.literal.is_none() {
-        vars(&mut s, ":root", &o.theme.dark);
-        s.push_str("@media(prefers-color-scheme:light){");
-        vars(&mut s, ":root", &o.theme.light);
-        s.push('}');
-        s.push_str(":root[data-theme=\"light\"]{");
-        inner_vars(&mut s, &o.theme.light);
-        s.push('}');
-        s.push_str(":root[data-theme=\"dark\"]{");
-        inner_vars(&mut s, &o.theme.dark);
-        s.push('}');
+        vars(&mut s, ":root", &o.theme.dark, &o.theme);
+        if o.theme.has_light() {
+            s.push_str("@media(prefers-color-scheme:light){");
+            vars(&mut s, ":root", o.theme.light(), &o.theme);
+            s.push('}');
+            s.push_str(":root[data-theme=\"light\"]{");
+            inner_vars(&mut s, o.theme.light(), &o.theme);
+            s.push('}');
+            s.push_str(":root[data-theme=\"dark\"]{");
+            inner_vars(&mut s, &o.theme.dark, &o.theme);
+            s.push('}');
+        }
     }
     s.push_str("text{white-space:pre;font-variant-ligatures:none}");
     s.push_str(".b{font-weight:700}.i{font-style:italic}.u{text-decoration:underline}");
-    let _ = write!(
-        s,
-        ".cur{{fill:{};opacity:.7}}",
-        paint(Color::Default, "fg", o.literal.as_ref())
-    );
+    let _ = write!(s, ".cur{{fill:{};opacity:.7}}", cursor_paint(o));
 
     if tl.len() > 1 {
         keyframes(&mut s, tl, content_h);
@@ -133,18 +132,60 @@ pub fn render(tl: &Timeline, o: &RenderOpts) -> String {
         s.push_str("</g>");
     }
 
-    s.push_str("</g></g></g></svg>");
+    s.push_str("</g></g></g>");
+
+    if o.theme.has_border() {
+        let _ = write!(
+            s,
+            r#"<rect x="0.5" y="0.5" width="{w}" height="{h}" rx="{r}" fill="none" stroke="{c}"/>"#,
+            w = num(width - 1.0),
+            h = num(height - 1.0),
+            r = if o.window { 10 } else { 6 },
+            c = slot(o, "border", |p| p.border()),
+        );
+    }
+
+    s.push_str("</svg>");
     s
 }
 
-fn vars(s: &mut String, sel: &str, p: &Palette) {
+fn slot(o: &RenderOpts, var: &str, pick: fn(&Palette) -> &str) -> String {
+    match &o.literal {
+        Some(p) => pick(p).to_string(),
+        None => format!("var(--{var})"),
+    }
+}
+
+fn cursor_paint(o: &RenderOpts) -> String {
+    if o.theme.has_cursor() {
+        slot(o, "cur", |p| p.cursor())
+    } else {
+        paint(Color::Default, "fg", o.literal.as_ref())
+    }
+}
+
+fn vars(s: &mut String, sel: &str, p: &Palette, t: &Theme) {
     let _ = write!(s, "{sel}{{");
-    inner_vars(s, p);
+    inner_vars(s, p, t);
     s.push('}');
 }
 
-fn inner_vars(s: &mut String, p: &Palette) {
+fn inner_vars(s: &mut String, p: &Palette, t: &Theme) {
     let _ = write!(s, "--bg:{};--fg:{};", p.bg, p.fg);
+    if t.has_cursor() {
+        let _ = write!(s, "--cur:{};", p.cursor());
+    }
+    if t.has_chrome() {
+        let _ = write!(s, "--chrome:{};", p.chrome());
+    }
+    if t.has_border() {
+        let _ = write!(s, "--border:{};", p.border());
+    }
+    if t.has_buttons() {
+        for (i, b) in p.buttons().iter().enumerate() {
+            let _ = write!(s, "--btn{i}:{b};");
+        }
+    }
     for (i, c) in p.ansi.iter().enumerate() {
         let _ = write!(s, "--c{i}:{c};");
     }
@@ -171,8 +212,41 @@ fn keyframes(s: &mut String, tl: &Timeline, frame_h: f64) {
 }
 
 fn chrome_bar(s: &mut String, o: &RenderOpts, width: f64) {
-    let dots = [("#ff5f57", 20.0), ("#febc2e", 38.0), ("#28c840", 56.0)];
-    for (fill, cx) in dots {
+    if o.theme.has_chrome() {
+        let r = 10.0;
+        let _ = write!(
+            s,
+            r#"<path d="M0,{r} A{r},{r} 0 0 1 {r},0 H{a} A{r},{r} 0 0 1 {w},{r} V{h} H0 Z" fill="{f}"/>"#,
+            r = num(r),
+            a = num(width - r),
+            w = num(width),
+            h = num(CHROME_H),
+            f = slot(o, "chrome", |p| p.chrome()),
+        );
+    }
+    if o.theme.has_border() {
+        let _ = write!(
+            s,
+            r#"<rect x="0" y="{y}" width="{w}" height="1" fill="{f}"/>"#,
+            y = num(CHROME_H),
+            w = num(width),
+            f = slot(o, "border", |p| p.border()),
+        );
+    }
+
+    let buttons: Vec<String> = o
+        .literal
+        .as_ref()
+        .map(|p| p.buttons().iter().map(|b| b.to_string()).collect())
+        .unwrap_or_else(|| {
+            if o.theme.has_buttons() {
+                (0..3).map(|i| format!("var(--btn{i})")).collect()
+            } else {
+                theme::BUTTONS.iter().map(|b| b.to_string()).collect()
+            }
+        });
+
+    for (fill, cx) in buttons.iter().zip([20.0, 38.0, 56.0]) {
         let _ = write!(
             s,
             r#"<circle cx="{cx}" cy="17" r="5.5" fill="{fill}"/>"#,

@@ -333,7 +333,7 @@ fn theme_body(f: &mut Ui, app: &App, area: Rect) {
 
     f.render_widget(
         Paragraph::new(match &theme {
-            Some(t) => Text::from(vec![preview::swatch(&t.dark), preview::swatch(&t.light)]),
+            Some(t) => Text::from(vec![preview::swatch(&t.dark), preview::swatch(t.light())]),
             None => Text::raw("theme could not be loaded"),
         })
         .block(panel("palette, dark then light")),
