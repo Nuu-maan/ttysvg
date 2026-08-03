@@ -1,0 +1,29 @@
+name = "catppuccin-frappe"
+
+[dark]
+fg = "#c6d0f5"
+bg = "#303446"
+cursor = "#f2d5cf"
+chrome = "#292c3c"
+border = "#414559"
+buttons = ["#e78284", "#e5c890", "#a6d189"]
+ansi = [
+  "#51576d", "#e78284", "#a6d189", "#e5c890",
+  "#8caaee", "#f4b8e4", "#81c8be", "#b5bfe2",
+  "#626880", "#e78284", "#a6d189", "#e5c890",
+  "#8caaee", "#f4b8e4", "#81c8be", "#a5adce",
+]
+
+[light]
+fg = "#4c4f69"
+bg = "#eff1f5"
+cursor = "#dc8a78"
+chrome = "#e6e9ef"
+border = "#ccd0da"
+buttons = ["#d20f39", "#df8e1d", "#40a02b"]
+ansi = [
+  "#5c5f77", "#d20f39", "#40a02b", "#df8e1d",
+  "#1e66f5", "#ea76cb", "#179299", "#acb0be",
+  "#6c6f85", "#d20f39", "#40a02b", "#df8e1d",
+  "#1e66f5", "#ea76cb", "#179299", "#bcc0cc",
+]

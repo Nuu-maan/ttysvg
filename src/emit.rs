@@ -54,6 +54,48 @@ pub fn write(path: &Path, bytes: &[u8]) -> Result<()> {
     std::fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
 }
 
+pub fn plain(frame: &Frame, cols: u16) -> String {
+    let mut out = String::new();
+    for row in &frame.rows {
+        let mut line = String::new();
+        for run in &row.runs {
+            let col = run.col as usize;
+            if col > line.chars().count() {
+                for _ in line.chars().count()..col {
+                    line.push(' ');
+                }
+            }
+            line.push_str(&run.text);
+        }
+        while line.chars().count() > cols as usize {
+            line.pop();
+        }
+        out.push_str(line.trim_end());
+        out.push('\n');
+    }
+    while out.ends_with("\n\n") {
+        out.pop();
+    }
+    out
+}
+
+pub fn beside(path: &Path, tag: &str) -> std::path::PathBuf {
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "out".into());
+    let name = if ext.is_empty() {
+        format!("{stem}-{tag}")
+    } else {
+        format!("{stem}-{tag}.{ext}")
+    };
+    path.with_file_name(name)
+}
+
 pub fn human_size(bytes: usize) -> String {
     if bytes < 1024 {
         format!("{bytes} B")

@@ -196,29 +196,39 @@ ttysvg build demo.tape --save demo.json
 ## Posting it somewhere that will not take an SVG
 
 An SVG is the right format for a README and the wrong one nearly everywhere else. Social
-sites, chat apps and issue trackers mostly reject it. `--gif` and `--png` cover that,
-and work on all three commands:
+sites, chat apps and issue trackers mostly reject it. Six other formats cover that, and
+all of them work on all three commands:
 
 ```
-ttysvg build demo.tape --gif demo.gif
+ttysvg build demo.tape --webp demo.webp
 ttysvg render session.json --gif demo.gif --scale 2
 ttysvg record --png shot.png -- ./my-tool
 ```
 
-`--gif` rasterizes every frame and encodes them with the timing the animation already
-has, so the result plays exactly like the SVG. `--png` writes a single still of the last
-frame, which is what you want for a thumbnail or a screenshot.
+Every animated format rasterizes each frame and carries the timing the animation already
+has, so the result plays exactly like the SVG.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--gif` | off | Also write an animated GIF |
-| `--png` | off | Also write a still PNG of the last frame |
+| `--webp` | off | Animated WebP, true color and far smaller than a GIF |
+| `--gif` | off | Animated GIF, the format everything accepts |
+| `--apng` | off | Animated PNG, true color, only the changed part of each frame is stored |
+| `--png` | off | A single still |
+| `--png-at` | last frame | Take the still from a moment instead, as in `--png-at 3s` |
+| `--txt` | off | The final screen as plain text, for grepping and diffing |
 | `--scale` | `1` | Multiply the pixel size, so `2` gives a retina bitmap |
 | `--light` | off | Rasterize the light palette instead of the dark one |
+| `--also-light` | off | Write the other palette too, alongside the first |
 
-Raster output has to commit to one palette, since a bitmap cannot carry the light and
-dark switch the SVG has. Dark is used unless you pass `--light`. The SVG is still written
-either way, so you can keep the theme aware version for your README and post the GIF.
+Pick WebP unless something in the chain refuses it. The same recording is usually an
+order of magnitude smaller as WebP than as GIF, and it keeps every color instead of being
+crushed to a palette of 256. GIF remains the safe answer for anywhere that has not caught
+up, notably X.
+
+A bitmap cannot carry the light and dark switch the SVG has, so raster output commits to
+one palette. Dark is used unless you pass `--light`, and `--also-light` writes both in one
+pass, naming the second file `demo-light.webp`. The SVG is still written either way, so
+the theme aware version can stay in your README while the WebP goes everywhere else.
 
 ## Recording something real
 
@@ -294,10 +304,10 @@ Captures a live session. Stops when the program exits.
 | `--save` | off | Also write the raw capture, for `ttysvg render` |
 | `--redact` | none | Mask everything matching this regex, repeatable |
 | `--sanitize` | off | Rewrite the home directory, username and hostname |
-| `--gif` `--png` | off | Also write raster output, see above |
+| `--webp` `--gif` `--apng` `--png` `--txt` | off | Also write raster or text output, see above |
 | `--scale` `--light` | `1`, off | Raster size multiplier and palette |
 | `--cols` `--rows` | your terminal size | Recording size in characters |
-| `--theme` | `tokyonight` | Theme name or path to a theme file |
+| `--theme` | `tokyonight` | Theme name, a `dark,light` pair, or a path to a theme file |
 | `--font` | system monospace stack | CSS font family used in the output |
 | `--font-size` | `14` | Pixels |
 | `--padding` | `18` | Pixels of space around the content |
@@ -321,7 +331,7 @@ Runs a tape. Any flag given here overrides the tape.
 | `--out` | Output path |
 | `--save` | Also write the raw capture, for `ttysvg render` |
 | `--redact` `--sanitize` | Added to whatever the tape already sets |
-| `--gif` `--png` `--scale` `--light` | Raster output, see above |
+| `--webp` `--gif` `--apng` `--png` `--txt` `--scale` `--light` `--also-light` | Raster and text output, see above |
 | `--theme` | Theme name or path |
 | `--speed` | Playback multiplier |
 | `--window` | Force the title bar on |
@@ -342,11 +352,53 @@ value the recording was made with.
 | `--window` `--no-window` `--title` | as recorded | Title bar, either direction |
 | `--no-loop` | as recorded | Play once instead of looping |
 | `--redact` `--sanitize` | none | Clean a capture that was recorded without them |
-| `--gif` `--png` `--scale` `--light` | off | Raster output, see above |
+| `--webp` `--gif` `--apng` `--png` `--txt` `--scale` `--light` `--also-light` | off | Raster and text output, see above |
 
-### ttysvg themes
+### ttysvg theme
 
-Lists the built in themes.
+| Command | What it does |
+|---|---|
+| `ttysvg theme list` | Every theme with its palette drawn in your terminal. `ttysvg themes` is the same thing |
+| `ttysvg theme show <name>` | One theme in full, both palettes, with the contrast measured |
+| `ttysvg theme import <file>` | Read a base16 scheme or a Windows Terminal settings file and keep the results |
+| `ttysvg theme where` | Print the directory imported themes live in |
+
+`import` takes a base16 scheme in either the old flat layout or the newer one with a
+`palette:` block, and a Windows Terminal `settings.json`, whether it holds one scheme or
+the whole list. Each scheme becomes a theme file named after it, and `--out` puts them
+somewhere else if you would rather not use the config directory. Imported themes are
+usable by name everywhere a built in theme is, including in the wizard's theme list.
+
+```
+ttysvg theme import ~/AppData/Local/Packages/Microsoft.WindowsTerminal.../settings.json
+ttysvg build demo.tape --theme campbell
+```
+
+Anything a theme does not define falls back to what ttysvg did before themes could set
+it, so an old theme file still works untouched.
+
+### Themes
+
+Sixteen built in, and `--theme` also takes a path to a theme file of your own.
+
+| Dark and light | Dark only | Light only |
+|---|---|---|
+| `tokyonight` `catppuccin` `catppuccin-mocha` `catppuccin-macchiato` `catppuccin-frappe` `gruvbox` `nord` `solarized` `everforest` `rose-pine` `github` | `dracula` `onedark` `monokai` `kanagawa` | `catppuccin-latte` |
+
+A theme carries a dark palette and, if one exists, a light palette. Where it does not, the
+dark palette is used for both and the SVG leaves out the `prefers-color-scheme` switch
+entirely rather than pretending to have two looks.
+
+You are not stuck with the pairs a theme happens to ship. Name two and each contributes
+one half:
+
+```
+ttysvg build demo.tape --theme "dracula,github"
+ttysvg build demo.tape --theme "dark=kanagawa,light=catppuccin-latte"
+```
+
+Beyond text and background, a theme can set the cursor, the title bar, the border and the
+three window buttons, which is what stops every theme sharing one window frame.
 
 ### Tape directives
 

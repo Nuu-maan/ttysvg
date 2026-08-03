@@ -72,6 +72,7 @@ pub struct App {
     pub commands: Vec<String>,
     pub line: usize,
     pub cfg: Config,
+    pub themes: Vec<String>,
     pub output: String,
     pub pause: Duration,
     pub done: Option<Done>,
@@ -97,6 +98,7 @@ impl App {
             step: Step::Preset,
             preset: 0,
             theme: 0,
+            themes: Theme::all_names(),
             field: 0,
             commands: vec![String::new()],
             line: 0,
@@ -110,12 +112,12 @@ impl App {
         }
     }
 
-    pub fn themes() -> Vec<&'static str> {
-        Theme::names()
+    pub fn themes(&self) -> &[String] {
+        &self.themes
     }
 
-    pub fn theme_name(&self) -> &'static str {
-        App::themes()[self.theme.min(App::themes().len() - 1)]
+    pub fn theme_name(&self) -> &str {
+        &self.themes[self.theme.min(self.themes.len() - 1)]
     }
 
     pub fn preset(&self) -> &'static preset::Preset {
@@ -291,7 +293,7 @@ impl App {
     }
 
     fn theme_key(&mut self, key: KeyEvent) {
-        let count = App::themes().len();
+        let count = self.themes.len();
         match key.code {
             KeyCode::Up | KeyCode::Left | KeyCode::Char('k') => {
                 self.theme = if self.theme == 0 {
@@ -377,7 +379,7 @@ impl App {
     }
 
     fn done_key(&mut self, key: KeyEvent) {
-        let count = App::themes().len();
+        let count = self.themes.len();
         match key.code {
             KeyCode::Up | KeyCode::Left => {
                 self.theme = if self.theme == 0 {

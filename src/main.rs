@@ -11,7 +11,7 @@ use ttysvg::raster;
 use ttysvg::redact::Rules;
 use ttysvg::session::Capture;
 use ttysvg::svg::render;
-use ttysvg::svg::theme::Theme;
+use ttysvg::svg::theme::{self, Theme};
 use ttysvg::tape::{self, Config, DEFAULT_FONT};
 use ttysvg::term::Frame;
 use ttysvg::ui;
@@ -34,6 +34,37 @@ enum Cmd {
     Build(BuildArgs),
     Render(RenderArgs),
     Themes,
+    Theme(ThemeArgs),
+}
+
+#[derive(Args)]
+struct ThemeArgs {
+    #[command(subcommand)]
+    cmd: ThemeCmd,
+}
+
+#[derive(Subcommand)]
+enum ThemeCmd {
+    Import(ImportArgs),
+    List,
+    Show(ShowArgs),
+    Where,
+}
+
+#[derive(Args)]
+struct ImportArgs {
+    file: PathBuf,
+    #[arg(short, long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    name: Option<String>,
+    #[arg(long)]
+    force: bool,
+}
+
+#[derive(Args)]
+struct ShowArgs {
+    name: String,
 }
 
 #[derive(Args)]
@@ -81,10 +112,34 @@ struct RasterArgs {
     gif: Option<PathBuf>,
     #[arg(long)]
     png: Option<PathBuf>,
+    #[arg(long)]
+    webp: Option<PathBuf>,
+    #[arg(long)]
+    apng: Option<PathBuf>,
+    #[arg(long)]
+    txt: Option<PathBuf>,
+    #[arg(long = "png-at")]
+    png_at: Option<String>,
     #[arg(long, default_value_t = 1.0)]
     scale: f32,
     #[arg(long)]
     light: bool,
+    #[arg(long = "also-light")]
+    also_light: bool,
+}
+
+#[derive(Clone, Copy)]
+enum Kind {
+    Png,
+    Gif,
+    Webp,
+    Apng,
+}
+
+impl Kind {
+    fn animated(self) -> bool {
+        !matches!(self, Kind::Png)
+    }
 }
 
 #[derive(Args)]
@@ -183,13 +238,138 @@ fn main() -> Result<()> {
         Some(Cmd::Record(a)) => record(a),
         Some(Cmd::Build(a)) => build(a),
         Some(Cmd::Render(a)) => rerender(a),
-        Some(Cmd::Themes) => {
-            for name in Theme::names() {
-                println!("{name}");
+        Some(Cmd::Themes) => theme_list(),
+        Some(Cmd::Theme(a)) => match a.cmd {
+            ThemeCmd::List => theme_list(),
+            ThemeCmd::Import(a) => theme_import(a),
+            ThemeCmd::Show(a) => theme_show(&a.name),
+            ThemeCmd::Where => {
+                match theme::user_dir() {
+                    Some(dir) => println!("{}", dir.display()),
+                    None => eprintln!("ttysvg: no config directory on this system"),
+                }
+                Ok(())
             }
-            Ok(())
+        },
+    }
+}
+
+fn bar(palette: &theme::Palette) -> String {
+    let mut out = String::new();
+    for color in &palette.ansi {
+        match theme::rgb(color) {
+            Some((r, g, b)) => out.push_str(&format!("\x1b[48;2;{r};{g};{b}m  ")),
+            None => out.push_str("  "),
         }
     }
+    out.push_str("\x1b[0m");
+    out
+}
+
+fn theme_list() -> Result<()> {
+    let names = Theme::all_names();
+    let width = names.iter().map(String::len).max().unwrap_or(0);
+    for name in &names {
+        let Ok(theme) = Theme::load(name) else {
+            println!("{name}");
+            continue;
+        };
+        println!(
+            "{name:width$}  {}  {}",
+            bar(&theme.dark),
+            if theme.has_light() {
+                "dark and light"
+            } else if ttysvg::svg::import::is_light(&theme) {
+                "light only"
+            } else {
+                "dark only"
+            }
+        );
+    }
+    Ok(())
+}
+
+fn theme_show(name: &str) -> Result<()> {
+    let theme = Theme::load(name)?;
+    theme.validate()?;
+
+    println!("{}", theme.name);
+    for (label, palette) in [("dark", &theme.dark), ("light", theme.light())] {
+        if label == "light" && !theme.has_light() {
+            println!("\nlight    falls back to the dark palette");
+            break;
+        }
+        println!("\n{label}");
+        println!("  text       {}", palette.fg);
+        println!("  background {}", palette.bg);
+        println!("  cursor     {}", palette.cursor());
+        if let Some(ratio) = palette.contrast() {
+            println!("  contrast   {ratio:.1} to 1");
+        }
+        println!("  {}", bar(palette));
+    }
+
+    for warning in theme.warnings() {
+        eprintln!("ttysvg: {warning}");
+    }
+    Ok(())
+}
+
+fn theme_import(a: ImportArgs) -> Result<()> {
+    let mut themes = ttysvg::svg::import::read(&a.file)?;
+
+    if let Some(name) = &a.name {
+        if themes.len() != 1 {
+            anyhow::bail!(
+                "--name needs a file with one scheme, this one has {}",
+                themes.len()
+            );
+        }
+        themes[0].name = ttysvg::svg::import::slug(name);
+    }
+
+    let dir = match a.out {
+        Some(dir) => dir,
+        None => theme::user_dir()
+            .context("no config directory on this system, pass --out to choose one")?,
+    };
+    std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+
+    let mut written = 0;
+    for theme in &themes {
+        theme.validate()?;
+        let path = dir.join(format!("{}.toml", theme.name));
+        if path.exists() && !a.force {
+            eprintln!("ttysvg: {} already exists, skipped", path.display());
+            continue;
+        }
+        let body = toml::to_string_pretty(theme).context("writing the theme")?;
+        write_out(&path, body.as_bytes())?;
+        written += 1;
+        println!(
+            "{}  {}{}",
+            theme.name,
+            bar(&theme.dark),
+            if ttysvg::svg::import::is_light(theme) {
+                "  light"
+            } else {
+                ""
+            }
+        );
+        for warning in theme.warnings() {
+            eprintln!("ttysvg: {} {warning}", theme.name);
+        }
+    }
+
+    eprintln!(
+        "ttysvg: imported {written} of {} into {}",
+        themes.len(),
+        dir.display()
+    );
+    if written > 0 {
+        eprintln!("ttysvg: use one with --theme <name>");
+    }
+    Ok(())
 }
 
 fn trim_opt(s: &str) -> Result<Option<Duration>> {
@@ -467,26 +647,66 @@ fn emit(
         anyhow::bail!("scale must be greater than zero");
     }
 
-    if let Some(path) = &raster_args.png {
-        let bytes = raster::png(&tl, &render_opts, scale, raster_args.light)?;
-        write_out(path, &bytes)?;
+    if let Some(path) = &raster_args.txt {
+        let frame = tl.frames.last().expect("timeline is not empty");
+        let text = ttysvg::emit::plain(frame, cfg.cols);
+        write_out(path, text.as_bytes())?;
         eprintln!(
-            "ttysvg: wrote {} (last frame, {})",
+            "ttysvg: wrote {} (last frame as text, {})",
             path.display(),
-            human_size(bytes.len())
+            human_size(text.len())
         );
     }
 
-    if let Some(path) = &raster_args.gif {
-        eprintln!("ttysvg: rasterizing {} frames for the gif", tl.len());
-        let bytes = raster::gif(&tl, &render_opts, scale, raster_args.light)?;
-        write_out(path, &bytes)?;
-        eprintln!(
-            "ttysvg: wrote {} ({} frames, {})",
-            path.display(),
-            tl.len(),
-            human_size(bytes.len())
-        );
+    let at = match &raster_args.png_at {
+        Some(v) => Some(tape::parse::duration(v)?),
+        None => None,
+    };
+
+    let wanted = [
+        (&raster_args.png, Kind::Png),
+        (&raster_args.gif, Kind::Gif),
+        (&raster_args.webp, Kind::Webp),
+        (&raster_args.apng, Kind::Apng),
+    ];
+
+    for (target, kind) in wanted {
+        let Some(path) = target else { continue };
+
+        let mut jobs = vec![(path.clone(), raster_args.light)];
+        if raster_args.also_light {
+            jobs.push((ttysvg::emit::beside(path, "light"), !raster_args.light));
+        }
+
+        for (out, light) in jobs {
+            if kind.animated() {
+                eprintln!(
+                    "ttysvg: rasterizing {} frames for {}",
+                    tl.len(),
+                    out.display()
+                );
+            }
+            let bytes = match kind {
+                Kind::Png => raster::png_at(&tl, &render_opts, scale, light, at)?,
+                Kind::Gif => raster::gif(&tl, &render_opts, scale, light)?,
+                Kind::Webp => raster::webp(&tl, &render_opts, scale, light)?,
+                Kind::Apng => raster::apng(&tl, &render_opts, scale, light)?,
+            };
+            write_out(&out, &bytes)?;
+            let what = if kind.animated() {
+                format!("{} frames", tl.len())
+            } else {
+                match at {
+                    Some(t) => format!("frame at {:.1}s", t.as_secs_f64()),
+                    None => "last frame".to_string(),
+                }
+            };
+            eprintln!(
+                "ttysvg: wrote {} ({what}, {})",
+                out.display(),
+                human_size(bytes.len())
+            );
+        }
     }
 
     Ok(())

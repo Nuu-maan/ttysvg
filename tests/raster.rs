@@ -149,6 +149,121 @@ fn gif_carries_every_frame_with_sane_delays() {
     assert_eq!(total, 150, "the gif should last as long as the timeline");
 }
 
+fn chunks(bytes: &[u8], tag: &[u8; 4]) -> usize {
+    bytes.windows(4).filter(|w| *w == tag).count()
+}
+
+#[test]
+fn webp_is_animated_and_carries_every_frame() {
+    let tl = timeline();
+    let bytes = raster::webp(&tl, &opts(), 1.0, false).unwrap();
+
+    assert_eq!(&bytes[..4], b"RIFF", "not a riff container");
+    assert_eq!(&bytes[8..12], b"WEBP", "not a webp");
+    assert_eq!(chunks(&bytes, b"ANIM"), 1, "webp is not animated");
+    assert_eq!(chunks(&bytes, b"ANMF"), tl.frames.len());
+}
+
+#[test]
+fn webp_beats_the_gif_on_size() {
+    let tl = timeline();
+    let gif = raster::gif(&tl, &opts(), 1.0, false).unwrap();
+    let webp = raster::webp(&tl, &opts(), 1.0, false).unwrap();
+    assert!(
+        webp.len() < gif.len(),
+        "webp {} bytes is not smaller than gif {} bytes",
+        webp.len(),
+        gif.len()
+    );
+}
+
+#[test]
+fn apng_is_animated_and_carries_every_frame() {
+    let tl = timeline();
+    let bytes = raster::apng(&tl, &opts(), 1.0, false).unwrap();
+
+    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n", "not a png");
+    assert_eq!(chunks(&bytes, b"acTL"), 1, "png is not animated");
+    assert_eq!(chunks(&bytes, b"fcTL"), tl.frames.len());
+    assert_eq!(
+        png_size(&bytes),
+        png_size(&raster::png(&tl, &opts(), 1.0, false).unwrap())
+    );
+}
+
+#[test]
+fn apng_only_stores_the_part_of_the_screen_that_changed() {
+    let tl = timeline();
+    let full = tl.frames.len() * (270 * 57 * 4);
+    let bytes = raster::apng(&tl, &opts(), 1.0, false).unwrap();
+    assert!(
+        bytes.len() < full / 4,
+        "apng kept {} bytes, close to {} raw frames",
+        bytes.len(),
+        tl.frames.len()
+    );
+}
+
+#[test]
+fn the_changed_box_is_the_smallest_one_that_covers_the_difference() {
+    let (w, h) = (4u32, 3u32);
+    let old = vec![0u8; (w * h * 4) as usize];
+
+    let mut new = old.clone();
+    let touch = |buf: &mut Vec<u8>, x: u32, y: u32| {
+        let i = ((y * w + x) * 4) as usize;
+        buf[i] = 255;
+    };
+    touch(&mut new, 1, 1);
+    touch(&mut new, 2, 2);
+
+    assert_eq!(
+        raster::dirty(&old, &new, w, h),
+        raster::Rect {
+            x: 1,
+            y: 1,
+            w: 2,
+            h: 2
+        }
+    );
+}
+
+#[test]
+fn an_unchanged_frame_still_writes_something_legal() {
+    let (w, h) = (4u32, 3u32);
+    let same = vec![7u8; (w * h * 4) as usize];
+    let patch = raster::dirty(&same, &same, w, h);
+    assert_eq!(patch.w, 1, "apng forbids a zero sized frame");
+    assert_eq!(patch.h, 1);
+}
+
+#[test]
+fn a_still_can_be_taken_from_any_moment() {
+    let tl = timeline();
+    let first = raster::png_at(&tl, &opts(), 1.0, false, Some(Duration::ZERO)).unwrap();
+    let middle =
+        raster::png_at(&tl, &opts(), 1.0, false, Some(Duration::from_millis(400))).unwrap();
+    let last = raster::png(&tl, &opts(), 1.0, false).unwrap();
+
+    assert_ne!(first, middle, "the two moments rendered the same");
+    assert_ne!(middle, last);
+    assert_eq!(
+        last,
+        raster::png_at(&tl, &opts(), 1.0, false, Some(Duration::from_secs(99))).unwrap(),
+        "a time past the end should land on the last frame"
+    );
+}
+
+#[test]
+fn a_moment_lands_on_the_frame_showing_at_that_time() {
+    let tl = timeline();
+    assert_eq!(raster::frame_at(&tl, Duration::ZERO), 0);
+    assert_eq!(raster::frame_at(&tl, Duration::from_millis(299)), 0);
+    assert_eq!(raster::frame_at(&tl, Duration::from_millis(300)), 1);
+    assert_eq!(raster::frame_at(&tl, Duration::from_millis(899)), 1);
+    assert_eq!(raster::frame_at(&tl, Duration::from_millis(900)), 2);
+}
+
 #[test]
 fn delays_follow_the_gaps_between_frames() {
     let tl = timeline();

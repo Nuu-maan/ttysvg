@@ -1,0 +1,15 @@
+name = "monokai"
+
+[dark]
+fg = "#f8f8f2"
+bg = "#272822"
+cursor = "#f8f8f0"
+chrome = "#1e1f1c"
+border = "#49483e"
+buttons = ["#f92672", "#f4bf75", "#a6e22e"]
+ansi = [
+  "#272822", "#f92672", "#a6e22e", "#f4bf75",
+  "#66d9ef", "#ae81ff", "#a1efe4", "#f8f8f2",
+  "#75715e", "#f92672", "#a6e22e", "#f4bf75",
+  "#66d9ef", "#ae81ff", "#a1efe4", "#f9f8f5",
+]

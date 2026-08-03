@@ -1,0 +1,29 @@
+name = "rose-pine"
+
+[dark]
+fg = "#e0def4"
+bg = "#191724"
+cursor = "#e0def4"
+chrome = "#1f1d2e"
+border = "#26233a"
+buttons = ["#eb6f92", "#f6c177", "#31748f"]
+ansi = [
+  "#26233a", "#eb6f92", "#31748f", "#f6c177",
+  "#9ccfd8", "#c4a7e7", "#ebbcba", "#e0def4",
+  "#6e6a86", "#eb6f92", "#31748f", "#f6c177",
+  "#9ccfd8", "#c4a7e7", "#ebbcba", "#e0def4",
+]
+
+[light]
+fg = "#575279"
+bg = "#faf4ed"
+cursor = "#575279"
+chrome = "#fffaf3"
+border = "#f2e9e1"
+buttons = ["#b4637a", "#ea9d34", "#286983"]
+ansi = [
+  "#f2e9e1", "#b4637a", "#286983", "#ea9d34",
+  "#56949f", "#907aa9", "#d7827e", "#575279",
+  "#9893a5", "#b4637a", "#286983", "#ea9d34",
+  "#56949f", "#907aa9", "#d7827e", "#575279",
+]
