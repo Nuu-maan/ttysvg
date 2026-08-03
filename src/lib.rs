@@ -7,3 +7,4 @@ pub mod session;
 pub mod svg;
 pub mod tape;
 pub mod term;
+pub mod ui;
