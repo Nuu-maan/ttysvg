@@ -75,7 +75,7 @@ fn loop_over(screen: &mut Screen, app: &mut App) -> Result<()> {
             }
             Action::Rerender => match write_files(app) {
                 Ok(done) => {
-                    let theme = app.theme_name();
+                    let theme = app.theme_name().to_string();
                     app.done = Some(done);
                     app.status = Some(format!("restyled with {theme}, nothing re-ran"));
                 }

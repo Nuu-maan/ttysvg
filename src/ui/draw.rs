@@ -303,7 +303,8 @@ fn theme_body(f: &mut Ui, app: &App, area: Rect) {
         Layout::horizontal([Constraint::Length(20), Constraint::Min(24)]).areas(area);
     caret(f, left.x + 2, left.y + 1 + app.theme as u16);
 
-    let items: Vec<ListItem> = App::themes()
+    let items: Vec<ListItem> = app
+        .themes()
         .iter()
         .enumerate()
         .map(|(i, name)| {

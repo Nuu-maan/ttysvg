@@ -147,7 +147,7 @@ fn an_empty_last_line_moves_on_instead_of_growing() {
 #[test]
 fn themes_cycle_and_land_in_the_config() {
     let mut app = App::new();
-    let names = App::themes();
+    let names = app.themes().to_vec();
 
     app.step = Step::Theme;
     press(&mut app, KeyCode::Down);

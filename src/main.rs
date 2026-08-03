@@ -11,7 +11,7 @@ use ttysvg::raster;
 use ttysvg::redact::Rules;
 use ttysvg::session::Capture;
 use ttysvg::svg::render;
-use ttysvg::svg::theme::Theme;
+use ttysvg::svg::theme::{self, Theme};
 use ttysvg::tape::{self, Config, DEFAULT_FONT};
 use ttysvg::term::Frame;
 use ttysvg::ui;
@@ -34,6 +34,37 @@ enum Cmd {
     Build(BuildArgs),
     Render(RenderArgs),
     Themes,
+    Theme(ThemeArgs),
+}
+
+#[derive(Args)]
+struct ThemeArgs {
+    #[command(subcommand)]
+    cmd: ThemeCmd,
+}
+
+#[derive(Subcommand)]
+enum ThemeCmd {
+    Import(ImportArgs),
+    List,
+    Show(ShowArgs),
+    Where,
+}
+
+#[derive(Args)]
+struct ImportArgs {
+    file: PathBuf,
+    #[arg(short, long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    name: Option<String>,
+    #[arg(long)]
+    force: bool,
+}
+
+#[derive(Args)]
+struct ShowArgs {
+    name: String,
 }
 
 #[derive(Args)]
@@ -207,13 +238,138 @@ fn main() -> Result<()> {
         Some(Cmd::Record(a)) => record(a),
         Some(Cmd::Build(a)) => build(a),
         Some(Cmd::Render(a)) => rerender(a),
-        Some(Cmd::Themes) => {
-            for name in Theme::names() {
-                println!("{name}");
+        Some(Cmd::Themes) => theme_list(),
+        Some(Cmd::Theme(a)) => match a.cmd {
+            ThemeCmd::List => theme_list(),
+            ThemeCmd::Import(a) => theme_import(a),
+            ThemeCmd::Show(a) => theme_show(&a.name),
+            ThemeCmd::Where => {
+                match theme::user_dir() {
+                    Some(dir) => println!("{}", dir.display()),
+                    None => eprintln!("ttysvg: no config directory on this system"),
+                }
+                Ok(())
             }
-            Ok(())
+        },
+    }
+}
+
+fn bar(palette: &theme::Palette) -> String {
+    let mut out = String::new();
+    for color in &palette.ansi {
+        match theme::rgb(color) {
+            Some((r, g, b)) => out.push_str(&format!("\x1b[48;2;{r};{g};{b}m  ")),
+            None => out.push_str("  "),
         }
     }
+    out.push_str("\x1b[0m");
+    out
+}
+
+fn theme_list() -> Result<()> {
+    let names = Theme::all_names();
+    let width = names.iter().map(String::len).max().unwrap_or(0);
+    for name in &names {
+        let Ok(theme) = Theme::load(name) else {
+            println!("{name}");
+            continue;
+        };
+        println!(
+            "{name:width$}  {}  {}",
+            bar(&theme.dark),
+            if theme.has_light() {
+                "dark and light"
+            } else if ttysvg::svg::import::is_light(&theme) {
+                "light only"
+            } else {
+                "dark only"
+            }
+        );
+    }
+    Ok(())
+}
+
+fn theme_show(name: &str) -> Result<()> {
+    let theme = Theme::load(name)?;
+    theme.validate()?;
+
+    println!("{}", theme.name);
+    for (label, palette) in [("dark", &theme.dark), ("light", theme.light())] {
+        if label == "light" && !theme.has_light() {
+            println!("\nlight    falls back to the dark palette");
+            break;
+        }
+        println!("\n{label}");
+        println!("  text       {}", palette.fg);
+        println!("  background {}", palette.bg);
+        println!("  cursor     {}", palette.cursor());
+        if let Some(ratio) = palette.contrast() {
+            println!("  contrast   {ratio:.1} to 1");
+        }
+        println!("  {}", bar(palette));
+    }
+
+    for warning in theme.warnings() {
+        eprintln!("ttysvg: {warning}");
+    }
+    Ok(())
+}
+
+fn theme_import(a: ImportArgs) -> Result<()> {
+    let mut themes = ttysvg::svg::import::read(&a.file)?;
+
+    if let Some(name) = &a.name {
+        if themes.len() != 1 {
+            anyhow::bail!(
+                "--name needs a file with one scheme, this one has {}",
+                themes.len()
+            );
+        }
+        themes[0].name = ttysvg::svg::import::slug(name);
+    }
+
+    let dir = match a.out {
+        Some(dir) => dir,
+        None => theme::user_dir()
+            .context("no config directory on this system, pass --out to choose one")?,
+    };
+    std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+
+    let mut written = 0;
+    for theme in &themes {
+        theme.validate()?;
+        let path = dir.join(format!("{}.toml", theme.name));
+        if path.exists() && !a.force {
+            eprintln!("ttysvg: {} already exists, skipped", path.display());
+            continue;
+        }
+        let body = toml::to_string_pretty(theme).context("writing the theme")?;
+        write_out(&path, body.as_bytes())?;
+        written += 1;
+        println!(
+            "{}  {}{}",
+            theme.name,
+            bar(&theme.dark),
+            if ttysvg::svg::import::is_light(theme) {
+                "  light"
+            } else {
+                ""
+            }
+        );
+        for warning in theme.warnings() {
+            eprintln!("ttysvg: {} {warning}", theme.name);
+        }
+    }
+
+    eprintln!(
+        "ttysvg: imported {written} of {} into {}",
+        themes.len(),
+        dir.display()
+    );
+    if written > 0 {
+        eprintln!("ttysvg: use one with --theme <name>");
+    }
+    Ok(())
 }
 
 fn trim_opt(s: &str) -> Result<Option<Duration>> {
