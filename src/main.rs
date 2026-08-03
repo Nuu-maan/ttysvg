@@ -81,10 +81,34 @@ struct RasterArgs {
     gif: Option<PathBuf>,
     #[arg(long)]
     png: Option<PathBuf>,
+    #[arg(long)]
+    webp: Option<PathBuf>,
+    #[arg(long)]
+    apng: Option<PathBuf>,
+    #[arg(long)]
+    txt: Option<PathBuf>,
+    #[arg(long = "png-at")]
+    png_at: Option<String>,
     #[arg(long, default_value_t = 1.0)]
     scale: f32,
     #[arg(long)]
     light: bool,
+    #[arg(long = "also-light")]
+    also_light: bool,
+}
+
+#[derive(Clone, Copy)]
+enum Kind {
+    Png,
+    Gif,
+    Webp,
+    Apng,
+}
+
+impl Kind {
+    fn animated(self) -> bool {
+        !matches!(self, Kind::Png)
+    }
 }
 
 #[derive(Args)]
@@ -467,26 +491,66 @@ fn emit(
         anyhow::bail!("scale must be greater than zero");
     }
 
-    if let Some(path) = &raster_args.png {
-        let bytes = raster::png(&tl, &render_opts, scale, raster_args.light)?;
-        write_out(path, &bytes)?;
+    if let Some(path) = &raster_args.txt {
+        let frame = tl.frames.last().expect("timeline is not empty");
+        let text = ttysvg::emit::plain(frame, cfg.cols);
+        write_out(path, text.as_bytes())?;
         eprintln!(
-            "ttysvg: wrote {} (last frame, {})",
+            "ttysvg: wrote {} (last frame as text, {})",
             path.display(),
-            human_size(bytes.len())
+            human_size(text.len())
         );
     }
 
-    if let Some(path) = &raster_args.gif {
-        eprintln!("ttysvg: rasterizing {} frames for the gif", tl.len());
-        let bytes = raster::gif(&tl, &render_opts, scale, raster_args.light)?;
-        write_out(path, &bytes)?;
-        eprintln!(
-            "ttysvg: wrote {} ({} frames, {})",
-            path.display(),
-            tl.len(),
-            human_size(bytes.len())
-        );
+    let at = match &raster_args.png_at {
+        Some(v) => Some(tape::parse::duration(v)?),
+        None => None,
+    };
+
+    let wanted = [
+        (&raster_args.png, Kind::Png),
+        (&raster_args.gif, Kind::Gif),
+        (&raster_args.webp, Kind::Webp),
+        (&raster_args.apng, Kind::Apng),
+    ];
+
+    for (target, kind) in wanted {
+        let Some(path) = target else { continue };
+
+        let mut jobs = vec![(path.clone(), raster_args.light)];
+        if raster_args.also_light {
+            jobs.push((ttysvg::emit::beside(path, "light"), !raster_args.light));
+        }
+
+        for (out, light) in jobs {
+            if kind.animated() {
+                eprintln!(
+                    "ttysvg: rasterizing {} frames for {}",
+                    tl.len(),
+                    out.display()
+                );
+            }
+            let bytes = match kind {
+                Kind::Png => raster::png_at(&tl, &render_opts, scale, light, at)?,
+                Kind::Gif => raster::gif(&tl, &render_opts, scale, light)?,
+                Kind::Webp => raster::webp(&tl, &render_opts, scale, light)?,
+                Kind::Apng => raster::apng(&tl, &render_opts, scale, light)?,
+            };
+            write_out(&out, &bytes)?;
+            let what = if kind.animated() {
+                format!("{} frames", tl.len())
+            } else {
+                match at {
+                    Some(t) => format!("frame at {:.1}s", t.as_secs_f64()),
+                    None => "last frame".to_string(),
+                }
+            };
+            eprintln!(
+                "ttysvg: wrote {} ({what}, {})",
+                out.display(),
+                human_size(bytes.len())
+            );
+        }
     }
 
     Ok(())
