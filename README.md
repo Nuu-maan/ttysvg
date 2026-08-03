@@ -20,6 +20,7 @@ It works on Windows, which is the reason this project exists.
 - **Sharp forever.** Vector text, not pixels. Zoom in as far as you like.
 - **Theme aware.** One file looks correct on both the light and dark versions of a page.
 - **Repeatable.** Write your demo as a short script and regenerate it whenever your output changes.
+- **Nothing to learn first.** Run `ttysvg` with no arguments and answer five questions.
 
 ## Why this exists
 
@@ -49,6 +50,46 @@ cargo install --path .
 
 That puts `ttysvg` on your PATH. To try it without installing, use `cargo run --` in
 place of `ttysvg` in any command below.
+
+## The short way in
+
+Run `ttysvg` with no arguments. It asks the two things only you can answer, the command
+to record and how it should look, and fills in everything else.
+
+<p align="center">
+  <img src="docs/examples/wizard.svg" alt="the ttysvg interactive mode, start to finish" width="100%">
+</p>
+
+Five steps, arrow keys and enter throughout:
+
+| Step | What it asks |
+|---|---|
+| 1 preset | `readme banner`, `full screen app`, `quick one liner` or `social preview`. The preset carries size, padding, font size, window chrome and timing. |
+| 2 command | The lines to run, in order. Each one is typed into your shell and followed by enter. |
+| 3 theme | Arrow through the themes with the palette and a sample frame beside them, so you pick by looking rather than by name. |
+| 4 details | Output path, title bar, sanitizing, and how long to hold after each command. |
+| 5 record | A summary, then enter. The session takes over the terminal so you watch it run for real. |
+
+When it finishes you land on a screen showing what was written, with the last frame drawn
+in the theme you chose. The arrow keys there restyle the file from the frames already
+captured, so switching theme or toggling the title bar is instant and nothing runs twice.
+
+It writes two files, not one. Next to `demo.svg` you get `demo.tape`, the script that
+produces it, so you leave with something repeatable without having had to learn the tape
+format first:
+
+```
+ttysvg build demo.tape
+```
+
+Sanitizing is on by default here, which masks your home directory, user name and machine
+name before any frame reaches the disk.
+
+Interactive mode types the commands for you, which is what makes the result repeatable.
+If you want to drive a program by hand instead, use `ttysvg record` below.
+
+That recording above is itself a tape, [`examples/wizard.tape`](examples/wizard.tape),
+driving `ttysvg` through its own interactive mode.
 
 ## Your first recording
 
@@ -228,6 +269,20 @@ That cleans the SVG it writes. It does not rewrite the capture file, so delete t
 if it already holds something it should not.
 
 ## Command reference
+
+### ttysvg
+
+No arguments opens interactive mode, described above. It needs a terminal, so in a script
+or a pipe use `record` or `build` instead.
+
+| Key | Meaning |
+|---|---|
+| up down | Move within the current step |
+| left right | Change a value, and on the last screen restyle the recording |
+| enter | Next step, and on step 5 start recording |
+| tab, shift tab | Jump a step forward or back without choosing anything |
+| esc | Back a step, and quit from the first one |
+| ctrl c | Quit from anywhere |
 
 ### ttysvg record
 
