@@ -1,0 +1,68 @@
+---
+title: How it works
+description: From pty bytes to one CSS keyframes block.
+---
+
+```
+ConPTY / Unix pty          bytes + timestamps
+  (portable-pty)  ─────────────────────────────▶  VT parser (vt100)
+        ▲                                                │
+        │ drives input,                                  │ screen snapshots
+        │ waits on screen state                          ▼
+   .tape script                                    frame timeline
+                                                         │
+                                                         ▼
+                                          optimizer (dedupe, trim idle,
+                                                     quantize, speed, tail)
+                                                         │
+                                                         ▼
+                                            SVG emitter, one @keyframes
+```
+
+## Escape sequences are never turned into SVG directly
+
+The byte stream feeds a real terminal grid that understands cursor movement,
+scroll regions, the alternate screen and line wrapping, and each state of that
+grid is photographed into a frame.
+
+That is the difference between recording a full screen TUI correctly and only
+recording `echo` correctly. A recorder that replays escape sequences into markup
+gets the second one right and the first one wrong.
+
+## One keyframes block, however many frames
+
+The output stacks every frame vertically inside one clipped group and animates
+`translateY` using a single `@keyframes` block with `step-end` timing.
+
+One CSS rule drives the whole animation no matter how many frames there are, and
+frames of different durations come for free, because each keyframe percentage is
+just placed where that frame's timestamp falls.
+
+## The platform boundary
+
+Everything after the parser is platform independent, which is why the emitter is
+tested against fixed byte streams with no terminal involved at all. The pty is
+the only part that knows what operating system it is on.
+
+```
+src/capture/    spawning a pty, reading it, running a tape against it
+src/term/       terminal grid to Frame, the platform independent boundary
+src/optimize.rs dedupe, trim idle, quantize, speed, tail
+src/raster.rs   webp, gif, apng and png output, one frame at a time through resvg
+src/redact.rs   masking secrets and rewriting paths before anything is written
+src/session.rs  saving and loading a capture, so it can be re-rendered
+src/svg/        the emitter, themes, escaping
+src/tape/       tape tokenizer and directives
+themes/         one TOML file per theme
+```
+
+## Raster output
+
+Each format shares one frame loop. A frame is emitted as a single frame
+timeline, rasterized through `resvg`, and handed to an encoder along with the
+timing the animation already has.
+
+APNG stores only the bounding box of what changed since the previous frame,
+using `BlendOp::Source` and `DisposeOp::None`. Writing every frame in full came
+to 1.5 MB on the reference recording, worse than the GIF; the dirty rectangle
+brings it to 96 KB.
