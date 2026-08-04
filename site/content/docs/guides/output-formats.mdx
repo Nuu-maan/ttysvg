@@ -1,0 +1,75 @@
+---
+title: Output formats
+description: WebP, GIF, APNG, PNG and plain text, for everywhere that will not take an SVG.
+---
+
+An SVG is the right format for a README and the wrong one nearly everywhere
+else. Social sites, chat apps and issue trackers mostly reject it. Six other
+formats cover that, and all of them work on all three commands.
+
+```bash
+ttysvg build demo.tape --webp demo.webp
+ttysvg render session.json --gif demo.gif --scale 2
+ttysvg record --png shot.png -- ./my-tool
+```
+
+Every animated format rasterizes each frame and carries the timing the animation
+already has, so the result plays exactly like the SVG.
+
+## The flags
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--webp` | off | Animated WebP, true color and far smaller than a GIF |
+| `--gif` | off | Animated GIF, the format everything accepts |
+| `--apng` | off | Animated PNG, true color, only the changed part of each frame is stored |
+| `--png` | off | A single still |
+| `--png-at` | last frame | Take the still from a moment instead, as in `--png-at 3s` |
+| `--txt` | off | The final screen as plain text, for grepping and diffing |
+| `--scale` | `1` | Multiply the pixel size, so `2` gives a retina bitmap |
+| `--light` | off | Rasterize the light palette instead of the dark one |
+| `--also-light` | off | Write the other palette too, alongside the first |
+
+## Which one to pick
+
+The same 93 frame recording, written four ways:
+
+| Format | Size |
+|---|---|
+| `--webp` | 34 KB |
+| `--apng` | 96 KB |
+| SVG | 424 KB |
+| `--gif` | 900 KB |
+
+Pick WebP unless something in the chain refuses it. The same recording is
+usually an order of magnitude smaller as WebP than as GIF, and it keeps every
+color instead of being crushed to a palette of 256. GIF remains the safe answer
+for anywhere that has not caught up, notably X.
+
+APNG stores only the bounding box of what changed since the previous frame,
+which is where its number comes from. Writing every frame in full came to
+1.5 MB, worse than the GIF.
+
+## Light and dark
+
+A bitmap cannot carry the switch the SVG has, so raster output commits to one
+palette. Dark is used unless you pass `--light`, and `--also-light` writes both
+in one pass, naming the second file `demo-light.webp`.
+
+```bash
+ttysvg render session.json --webp demo.webp --also-light
+```
+
+The SVG is still written either way, so the theme aware version can stay in your
+README while the WebP goes everywhere else.
+
+## A still from the middle
+
+The last frame is usually the least interesting moment, because the command has
+finished and the prompt is back.
+
+```bash
+ttysvg render session.json --png card.png --png-at 3s --scale 2
+```
+
+That is also how to make a social card, and it is what produced this site's own.

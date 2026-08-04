@@ -1,0 +1,63 @@
+---
+title: Recording once, restyling forever
+description: Save the frames, then replay every visual and timing choice without running anything again.
+---
+
+Rebuilding a tape re-runs your command, which takes as long as the command takes
+and depends on the machine still being in the same state. If all you want to
+change is how the recording looks, save the capture instead:
+
+```bash
+ttysvg record --out demo.svg --save demo.json -- cargo build
+```
+
+`demo.json` holds the terminal frames and their timing, not the SVG. Every style
+and timing choice can then be replayed against it with no terminal involved:
+
+```bash
+ttysvg render demo.json --theme gruvbox
+ttysvg render demo.json --speed 2 --window --title "cargo build"
+ttysvg render demo.json --info
+```
+
+This is the difference between a two second loop and a two minute one. Rendering
+reads the saved frames straight from disk, so it finishes in milliseconds
+however long the original command took.
+
+Re-rendering with no flags reproduces the original SVG byte for byte, because
+the recording stored the settings it was made with.
+
+## Every command can save one
+
+```bash
+ttysvg record --save session.json -- ./my-tool
+ttysvg build demo.tape --save demo.json
+```
+
+`--save` on its own skips the SVG entirely.
+
+## One take, many outputs
+
+```bash
+ttysvg record --save session.json --out docs/demo.svg -- mytool --help
+
+ttysvg render session.json --theme tokyonight --out docs/tokyonight.svg
+ttysvg render session.json --theme catppuccin --out docs/catppuccin.svg
+ttysvg render session.json --theme gruvbox    --out docs/gruvbox.svg
+ttysvg render session.json --theme nord       --out docs/nord.svg
+```
+
+Nothing was executed again. The same trick gives a wide social preview and a
+compact inline banner from one take:
+
+```bash
+ttysvg render session.json --font-size 18 --padding 32 --out docs/social.svg
+ttysvg render session.json --font-size 12 --padding 12 --no-loop --out docs/inline.svg
+```
+
+## What cannot change
+
+Everything except `--cols` and `--rows`. Those two are fixed at record time,
+because a capture stores the terminal grid after wrapping rather than the bytes
+that produced it. Reflowing to a new width would need the recording to be made
+again.
