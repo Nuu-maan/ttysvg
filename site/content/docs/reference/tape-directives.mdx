@@ -1,0 +1,60 @@
+---
+title: Tape directives
+description: Every settings directive and every action a tape can run.
+---
+
+Lines starting with `#` are comments. Durations accept `ms`, `s` and `m`, and a
+bare number means milliseconds. Backslashes inside quotes are literal, so
+Windows paths like `type ".\scripts\build.ps1"` work as written.
+
+## Settings
+
+Valid anywhere in the file.
+
+| Directive | Example |
+|---|---|
+| `output` | `output "docs/demo.svg"` |
+| `theme` | `theme "catppuccin"` |
+| `width` `height` | `width 90` |
+| `font` | `font "JetBrains Mono" 14` |
+| `font-size` `padding` | `padding 20` |
+| `advance` `line-height` | `advance 8.4` |
+| `shell` | `shell "bash" "-i"` |
+| `window` `title` `loop` | `window on` |
+| `trim-idle` `tail` `speed` | `trim-idle 500ms` |
+| `type-delay` | `type-delay 40ms` |
+| `redact` | `redact "sk-[A-Za-z0-9]+"` |
+| `sanitize` | `sanitize on` |
+
+## Actions
+
+Run in order.
+
+| Directive | Example |
+|---|---|
+| `type` | `type "cargo build"` |
+| `wait` | `wait "Finished" 30s` |
+| `sleep` | `sleep 1.5s` |
+| `enter` `tab` `backspace` `escape` `space` | `enter` |
+| `up` `down` `left` `right` | `down 3` |
+| `ctrl` | `ctrl c` |
+
+Key directives take an optional repeat count, so `down 3` presses it three
+times.
+
+## The two timing levers
+
+`speed` and `trim-idle` do different things and are worth setting
+independently.
+
+```tape
+speed 3.0        # plays the whole recording three times faster
+trim-idle 400ms  # caps every individual gap
+```
+
+`speed` compresses everything uniformly. `trim-idle` only touches dead air, so a
+linker that stalls for twenty seconds becomes a short pause rather than a frozen
+picture, while the parts where something is happening keep their real rhythm.
+
+`tail` is separate again: it is how long the final frame holds before the loop
+restarts, which is what gives the reader time to register the result.

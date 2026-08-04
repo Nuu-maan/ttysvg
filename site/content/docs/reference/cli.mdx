@@ -1,0 +1,77 @@
+---
+title: Command reference
+description: Every command and flag on ttysvg, record, build, render and theme.
+---
+
+## ttysvg
+
+No arguments opens [interactive mode](/docs/getting-started/interactive-mode).
+It needs a terminal, so in a script or a pipe use `record` or `build` instead.
+
+## ttysvg record
+
+Captures a live session. Stops when the program exits. Everything after `--` is
+the command to record.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--out` | `demo.svg` | Output path |
+| `--save` | off | Also write the raw capture, for `ttysvg render` |
+| `--redact` | none | Mask everything matching this regex, repeatable |
+| `--sanitize` | off | Rewrite the home directory, username and hostname |
+| `--webp` `--gif` `--apng` `--png` `--txt` | off | Also write raster or text output |
+| `--scale` `--light` | `1`, off | Raster size multiplier and palette |
+| `--cols` `--rows` | your terminal size | Recording size in characters |
+| `--theme` | `tokyonight` | Theme name, a `dark,light` pair, or a path to a theme file |
+| `--font` | system monospace stack | CSS font family used in the output |
+| `--font-size` | `14` | Pixels |
+| `--padding` | `18` | Pixels of space around the content |
+| `--window` | off | Draw a title bar |
+| `--title` | empty | Text shown in the title bar |
+| `--trim-idle` | `1s` | Collapse pauses longer than this, or `off` to keep real timing |
+| `--speed` | `1.0` | Playback multiplier, so `2` is twice as fast |
+| `--tail` | `2s` | How long the final frame holds before the loop restarts |
+| `--no-loop` | off | Play once instead of looping |
+| `--advance` | auto | Override character width in pixels |
+| `--line-height` | auto | Override line height in pixels |
+
+## ttysvg build
+
+Runs a tape. Any flag given here overrides the tape.
+
+| Flag | Meaning |
+|---|---|
+| `--out` | Output path |
+| `--save` | Also write the raw capture, for `ttysvg render` |
+| `--redact` `--sanitize` | Added to whatever the tape already sets |
+| `--webp` `--gif` `--apng` `--png` `--txt` `--scale` `--light` `--also-light` | Raster and text output |
+| `--theme` | Theme name or path |
+| `--speed` | Playback multiplier |
+| `--window` | Force the title bar on |
+| `--title` | Title bar text |
+
+## ttysvg render
+
+Rebuilds an SVG from a saved capture. Nothing is executed. Anything not given
+keeps the value the recording was made with.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--out` | the capture path with an `.svg` extension | Output path |
+| `--info` | off | Print what the capture holds and exit |
+| `--theme` `--font` `--font-size` | as recorded | Same meaning as on `record` |
+| `--padding` `--advance` `--line-height` | as recorded | Same meaning as on `record` |
+| `--trim-idle` `--speed` `--tail` | as recorded | Retime without re-running anything |
+| `--window` `--no-window` `--title` | as recorded | Title bar, either direction |
+| `--no-loop` | as recorded | Play once instead of looping |
+| `--redact` `--sanitize` | none | Clean a capture that was recorded without them |
+| `--webp` `--gif` `--apng` `--png` `--txt` `--scale` `--light` `--also-light` | off | Raster and text output |
+
+## ttysvg theme
+
+| Command | What it does |
+|---|---|
+| `ttysvg theme list` | Every theme with its palette drawn in your terminal. `ttysvg themes` is the same thing |
+| `ttysvg theme show <name>` | One theme in full, both palettes, with the contrast measured |
+| `ttysvg theme import <file>` | Read a base16 scheme or a Windows Terminal settings file and keep the results |
+| `ttysvg theme where` | Print the directory imported themes live in |
