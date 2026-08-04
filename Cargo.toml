@@ -8,22 +8,44 @@ repository = "https://github.com/nuu-maan/ttysvg"
 readme = "README.md"
 keywords = ["terminal", "svg", "recording", "conpty", "demo"]
 categories = ["command-line-utilities"]
+exclude = ["site/", "wasm/"]
+
+[workspace]
+members = ["wasm"]
+
+[features]
+default = ["cli"]
+cli = [
+    "dep:clap",
+    "dep:crossterm",
+    "dep:gif",
+    "dep:png",
+    "dep:portable-pty",
+    "dep:ratatui",
+    "dep:resvg",
+    "dep:webp-animation",
+]
+
+[[bin]]
+name = "ttysvg"
+path = "src/main.rs"
+required-features = ["cli"]
 
 [dependencies]
 anyhow = "1"
-clap = { version = "4", features = ["derive"] }
-crossterm = "0.28"
-gif = "0.14.2"
-png = "0.18.1"
-portable-pty = "0.8"
-ratatui = "0.29"
+clap = { version = "4", features = ["derive"], optional = true }
+crossterm = { version = "0.28", optional = true }
+gif = { version = "0.14.2", optional = true }
+png = { version = "0.18.1", optional = true }
+portable-pty = { version = "0.8", optional = true }
+ratatui = { version = "0.29", optional = true }
 regex = "1"
-resvg = "0.48.1"
+resvg = { version = "0.48.1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
 vt100 = "0.15"
-webp-animation = "0.10.0"
+webp-animation = { version = "0.10.0", optional = true }
 
 [dev-dependencies]
 gif = "0.14"

@@ -1,10 +1,13 @@
+#[cfg(feature = "cli")]
 pub mod capture;
 pub mod emit;
 pub mod optimize;
+#[cfg(feature = "cli")]
 pub mod raster;
 pub mod redact;
 pub mod session;
 pub mod svg;
 pub mod tape;
 pub mod term;
+#[cfg(feature = "cli")]
 pub mod ui;
