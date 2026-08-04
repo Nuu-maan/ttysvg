@@ -1,0 +1,43 @@
+---
+title: Install
+description: Build ttysvg from source with Cargo, on Windows, macOS or Linux.
+---
+
+You need [Rust](https://rustup.rs). On Windows you also need Windows 10 version
+1809 or newer, which is when ConPTY arrived.
+
+```bash
+git clone https://github.com/Nuu-maan/ttysvg
+cd ttysvg
+cargo install --path .
+```
+
+That puts `ttysvg` on your `PATH`.
+
+To try it without installing, use `cargo run --` in place of `ttysvg` in any
+command in these docs:
+
+```bash
+cargo run -- record --out demo.svg -- powershell -NoLogo
+```
+
+## Checking it worked
+
+```bash
+ttysvg --help
+ttysvg themes
+```
+
+`ttysvg themes` prints every built in theme with its palette drawn in your
+terminal, which is also the quickest way to confirm your terminal is reporting
+true color correctly.
+
+## Platform notes
+
+**Windows.** ConPTY is used directly, so there is nothing else to install. If
+you are on a build older than 1809 the pseudo console does not exist and there
+is no fallback.
+
+**macOS and Linux.** A normal pty is used through the same code path. Everything
+after the terminal parser is platform independent, so tapes written on one
+platform work on another once you change the `shell` line.

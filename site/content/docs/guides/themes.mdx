@@ -1,0 +1,80 @@
+---
+title: Themes
+description: Sixteen built in, pairing a dark with a light one, and importing hundreds more.
+---
+
+```bash
+ttysvg themes
+```
+
+Sixteen ship with the tool, and `--theme` also takes a path to a theme file of
+your own.
+
+| Dark and light | Dark only | Light only |
+|---|---|---|
+| `tokyonight` `catppuccin` `catppuccin-mocha` `catppuccin-macchiato` `catppuccin-frappe` `gruvbox` `nord` `solarized` `everforest` `rose-pine` `github` | `dracula` `onedark` `monokai` `kanagawa` | `catppuccin-latte` |
+
+A theme carries a dark palette and, if one exists, a light palette. Where it does
+not, the dark palette is used for both and the SVG leaves out the
+`prefers-color-scheme` switch entirely rather than pretending to have two looks.
+
+## Pairing two themes
+
+You are not stuck with the pairs a theme happens to ship. Name two and each
+contributes one half:
+
+```bash
+ttysvg build demo.tape --theme "dracula,github"
+ttysvg build demo.tape --theme "dark=kanagawa,light=catppuccin-latte"
+```
+
+## What a theme controls
+
+Beyond text and background, a theme can set the cursor, the title bar, the
+border and the three window buttons, which is what stops every theme sharing one
+window frame. Anything a theme does not define falls back to what ttysvg did
+before themes could set it, so an old theme file still works untouched.
+
+The full file format is in the [theme reference](/docs/reference/theme-file).
+
+## Looking before choosing
+
+```bash
+ttysvg theme list          # every theme with its palette drawn in your terminal
+ttysvg theme show dracula  # one theme in full, both palettes, contrast measured
+```
+
+A name tells you nothing about what a theme looks like, so both commands draw
+real swatches. `show` measures contrast, so a theme that would be hard to read
+says so.
+
+## Importing
+
+```bash
+ttysvg theme import settings.json
+ttysvg theme import base16-ocean.yaml
+```
+
+Base16 was the highest leverage format available: a published spec, hundreds of
+schemes in the wild, and a standardised mapping onto the sixteen ANSI slots.
+Both file layouts are read, the old flat one and the newer `palette:` block.
+
+Windows Terminal is the other half, since that is what the average Windows user
+already has open. A `settings.json` holding thirty schemes imports in one
+command.
+
+Imported themes land in the config directory and load by name everywhere a built
+in one does, including in the wizard's theme list:
+
+```bash
+ttysvg theme import ~/AppData/Local/Packages/Microsoft.WindowsTerminal.../settings.json
+ttysvg build demo.tape --theme campbell
+```
+
+`ttysvg theme where` prints the directory they live in, and `--out` puts them
+somewhere else.
+
+<Callout type="info">
+  iTerm `.itermcolors` files are property lists and are not read. Base16 and
+  Windows Terminal cover most of the ground.
+</Callout>

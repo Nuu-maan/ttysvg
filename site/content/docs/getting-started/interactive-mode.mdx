@@ -1,0 +1,64 @@
+---
+title: Interactive mode
+description: Run ttysvg with no arguments and answer five questions.
+---
+
+Run `ttysvg` with no arguments. It asks the two things only you can answer, the
+command to record and how it should look, and fills in everything else.
+
+<Recording
+  src="/demos/wizard.svg"
+  width={880}
+  height={554}
+  alt="The ttysvg interactive mode, from the first prompt through to the finished recording"
+/>
+
+Five steps, arrow keys and enter throughout.
+
+| Step | What it asks |
+|---|---|
+| 1 preset | `readme banner`, `full screen app`, `quick one liner` or `social preview`. The preset carries size, padding, font size, window chrome and timing. |
+| 2 command | The lines to run, in order. Each one is typed into your shell and followed by enter. |
+| 3 theme | Arrow through the themes with the palette and a sample frame beside them, so you pick by looking rather than by name. |
+| 4 details | Output path, title bar, sanitizing, and how long to hold after each command. |
+| 5 record | A summary, then enter. The session takes over the terminal so you watch it run for real. |
+
+## Keys
+
+| Key | Meaning |
+|---|---|
+| up, down | Move within the current step |
+| left, right | Change a value, and on the last screen restyle the recording |
+| enter | Next step, and on step 5 start recording |
+| tab, shift tab | Jump a step forward or back without choosing anything |
+| esc | Back a step, and quit from the first one |
+| ctrl c | Quit from anywhere |
+
+## The screen at the end
+
+When it finishes you land on a screen showing what was written, with the last
+frame drawn in the theme you chose. The arrow keys there restyle the file from
+the frames already captured, so switching theme or toggling the title bar is
+instant and nothing runs twice.
+
+## It writes two files
+
+Next to `demo.svg` you get `demo.tape`, the script that produces it, so you
+leave with something repeatable without having had to learn the tape format
+first:
+
+```bash
+ttysvg build demo.tape
+```
+
+Sanitizing is on by default here, which masks your home directory, user name and
+machine name before any frame reaches the disk.
+
+Interactive mode types the commands for you, which is what makes the result
+repeatable. To drive a program by hand instead, use
+[`ttysvg record`](/docs/reference/cli#ttysvg-record).
+
+<Callout type="info">
+  Interactive mode needs a real terminal. In a script or a pipe, use `record` or
+  `build`.
+</Callout>
